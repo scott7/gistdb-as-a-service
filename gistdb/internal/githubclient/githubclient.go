@@ -1,6 +1,7 @@
 package githubclient
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -162,4 +163,37 @@ func ConvertToGist(api gistAPIResponse) (Gist, error) {
 	}
 
 	return g, nil
+}
+
+func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[string]any, gists_map map[string]string) (map[string]any, error) {
+	url := "https://api.github.com/gists/" + gistID
+	var out map[string]any
+	jsonBytes, err := json.Marshal(content)
+	if err != nil {
+		return nil, err
+	}
+	filename_from_map := gists_map[gistID]
+	if filename != filename_from_map {
+		return nil, fmt.Errorf("provided filename does not match recorded filename in database: %v", filename)
+	}
+
+	jsonString := string(jsonBytes)
+	payload := map[string]any{
+		"files": map[string]any{
+			filename: map[string]any{
+				"content": jsonString,
+			},
+		},
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling content: %w", err)
+	}
+	bodyReader := bytes.NewReader(jsonPayload)
+	if err := c.doGitHubRequest("PATCH", url, bodyReader, &out); err != nil {
+		fmt.Printf("error here\n")
+		return nil, err
+	}
+
+	return out, nil
 }
