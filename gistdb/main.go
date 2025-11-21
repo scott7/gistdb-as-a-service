@@ -39,7 +39,7 @@ func main() {
 		}
 		fmt.Printf("Setting gist in cache: %#v\n", gistRes.Content)
 		cache.Set(gistRes.Name, gistRes.Content)
-		out, err := client.UpdateGist("e51d4bbcfeb141a95c9e6c74f8309e3d", "readme", gistRes.Content, gists_map)
+		out, err := client.CreateGist(gistRes.Content)
 		fmt.Printf("out: %#v\n", out)
 		fmt.Printf("error: %#v\n", err)
 

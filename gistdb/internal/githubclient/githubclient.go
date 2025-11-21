@@ -2,6 +2,8 @@ package githubclient
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,6 +26,12 @@ func NewGitHubClient(token string) *GitHubClient {
 		httpClient: &http.Client{},
 		token:      token,
 	}
+}
+
+func NewShortID() string {
+	b := make([]byte, 8)
+	rand.Read(b)
+	return hex.EncodeToString(b) + ".json"
 }
 
 type gistAPIResponse struct {
@@ -49,7 +57,7 @@ func (c *GitHubClient) doGitHubRequest(method, url string, body io.Reader, out a
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated {
 		return fmt.Errorf("GitHub API returned status: %d", res.StatusCode)
 	}
 
@@ -168,7 +176,7 @@ func ConvertToGist(api gistAPIResponse) (Gist, error) {
 func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[string]any, gists_map map[string]string) (map[string]any, error) {
 	url := "https://api.github.com/gists/" + gistID
 	var out map[string]any
-	jsonBytes, err := json.Marshal(content)
+	jsonBytes, err := json.MarshalIndent(content, "", "  ")
 	if err != nil {
 		return nil, err
 	}
@@ -185,13 +193,54 @@ func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[st
 			},
 		},
 	}
-	jsonPayload, err := json.Marshal(payload)
+	jsonPayload, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling content: %w", err)
 	}
 	bodyReader := bytes.NewReader(jsonPayload)
 	if err := c.doGitHubRequest("PATCH", url, bodyReader, &out); err != nil {
 		fmt.Printf("error here\n")
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (c *GitHubClient) CreateGist(content map[string]any) (map[string]any, error) {
+	url := "https://api.github.com/gists"
+	var out map[string]any
+	jsonBytes, err := json.MarshalIndent(content, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	filename := NewShortID()
+
+	jsonString := string(jsonBytes)
+	payload := map[string]any{
+		"public": false,
+		"files": map[string]any{
+			filename: map[string]any{
+				"content": jsonString,
+			},
+		},
+	}
+	jsonPayload, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling content: %w", err)
+	}
+	bodyReader := bytes.NewReader(jsonPayload)
+	if err := c.doGitHubRequest("POST", url, bodyReader, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (c *GitHubClient) DeleteGist(gistID string) (map[string]any, error) {
+	url := "https://api.github.com/gists/" + gistID
+
+	var out map[string]any
+	if err := c.doGitHubRequest("DELETE", url, nil, &out); err != nil {
 		return nil, err
 	}
 
