@@ -36,9 +36,6 @@ func (c *Cache) Set(key string, value any) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	fmt.Printf("key is %#v\n", key)
-	fmt.Printf("value is %#v\n\n", value)
-
 	// clear in memory cache if we exceed a large number of items
 	length := len(c.data)
 	if length > 1000 {
@@ -65,9 +62,9 @@ func (c *Cache) Set(key string, value any) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("============")
-	fmt.Println(string(fileCacheContent))
-	fmt.Println("============")
+	//fmt.Println("============")
+	//fmt.Println(string(fileCacheContent))
+	//fmt.Println("============")
 
 	//Unmarshal into a generic map
 	var fileCacheMap map[string]any
@@ -76,7 +73,6 @@ func (c *Cache) Set(key string, value any) error {
 		fmt.Println("Error unmarshaling to map:", err)
 	}
 	fileCacheMap[key] = value
-	fmt.Printf("Unmarshal to map: %+v\n", fileCacheMap)
 
 	// Serialize entire cache to JSON
 	bytes, err := json.MarshalIndent(fileCacheMap, "", "  ")
@@ -98,6 +94,53 @@ func (c *Cache) Set(key string, value any) error {
 
 	return nil
 
+}
+
+func (c *Cache) Assign(value map[string]string) error {
+	// overwrite cache with specified value
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// set data in file based memory cache
+	// create file if it does not exist
+	if fileThere(c.filepath) {
+		fmt.Printf("File '%s' exists.\n", c.filepath)
+	} else {
+		err := os.WriteFile(c.filepath, []byte("{}"), 0644)
+		if err != nil {
+			log.Fatalf("Error writing to file: %v", err)
+		}
+	}
+
+	newData := make(map[string]CacheItem, len(value))
+
+	for key, val := range value {
+		newData[key] = CacheItem{
+			Value: val,
+		}
+	}
+
+	c.data = newData
+
+	// Serialize entire cache to JSON
+	bytes, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to encode cache: %w", err)
+	}
+
+	// Write JSON to file atomically
+	tmp := c.filepath + ".tmp"
+
+	if err := os.WriteFile(tmp, bytes, 0644); err != nil {
+		return fmt.Errorf("failed to write tmp file: %w", err)
+	}
+
+	// Atomic rename
+	if err := os.Rename(tmp, c.filepath); err != nil {
+		return fmt.Errorf("failed to replace cache file: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Cache) Get(key string) (any, bool) {
@@ -125,7 +168,7 @@ func (c *Cache) Get(key string) (any, bool) {
 		fmt.Printf("found in file cache: %v\n", item)
 		return item, true
 	}
-	fmt.Printf("found in file in memory cache: %v\n", item)
+	//fmt.Printf("found in file in memory cache: %v\n", item)
 	return item.Value, true
 }
 

@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type Gist struct {
-	ID      string         `json:"id"`
+	GistID  string         `json:"gist_id"`
 	Name    string         `json:"name"`
 	Content map[string]any `json:"content"`
 }
@@ -34,9 +35,15 @@ func NewShortID() string {
 	return hex.EncodeToString(b) + ".json"
 }
 
+func getTime() string {
+	currentTime := time.Now()
+	formattedTime := currentTime.Format(time.RFC3339)
+	return formattedTime
+}
+
 type gistAPIResponse struct {
-	ID    string `json:"id"`
-	Files map[string]struct {
+	GistID string `json:"id"`
+	Files  map[string]struct {
 		Filename string `json:"filename"`
 		Content  any    `json:"content"`
 	} `json:"files"`
@@ -124,7 +131,7 @@ func ExtractGistNames(gists []map[string]any) map[string]string {
 		}
 
 		for filename := range filesRaw {
-			result[id] = filename
+			result[filename] = id
 			break
 		}
 	}
@@ -148,7 +155,7 @@ func parseGist(raw map[string]any) (gistAPIResponse, error) {
 
 func ConvertToGist(api gistAPIResponse) (Gist, error) {
 	g := Gist{
-		ID:      api.ID,
+		GistID:  api.GistID,
 		Content: make(map[string]any),
 	}
 
@@ -206,14 +213,17 @@ func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[st
 	return out, nil
 }
 
-func (c *GitHubClient) CreateGist(content map[string]any) (map[string]any, error) {
+func (c *GitHubClient) CreateGist(collection string, content map[string]any) (map[string]any, error) {
 	url := "https://api.github.com/gists"
 	var out map[string]any
+	filename := NewShortID()
+	content["id"] = filename
+	content["collection"] = collection
+	content["createdAt"] = getTime()
 	jsonBytes, err := json.MarshalIndent(content, "", "  ")
 	if err != nil {
 		return nil, err
 	}
-	filename := NewShortID()
 
 	jsonString := string(jsonBytes)
 	payload := map[string]any{
@@ -232,6 +242,7 @@ func (c *GitHubClient) CreateGist(content map[string]any) (map[string]any, error
 	if err := c.doGitHubRequest("POST", url, bodyReader, &out); err != nil {
 		return nil, err
 	}
+	out["customId"] = filename
 
 	return out, nil
 }
