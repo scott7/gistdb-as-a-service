@@ -21,7 +21,7 @@ func main() {
 		log.Fatal("GITHUB_TOKEN environment variable is required")
 	}
 
-	client := githubclient.NewGitHubClient(token)
+	client := githubclient.NewGitHubClient(token, cache)
 
 	gists, err := client.ListGists()
 	if err != nil {
@@ -35,8 +35,9 @@ func main() {
 		fmt.Printf("gist name: %#v\n", gistName)
 	}
 
-	for gistID := range gists_map {
-		gistRes, err := client.GetGistTyped(gistID)
+	for _, gistID := range gists_map {
+		gistIdStr, _ := gistID.(string)
+		gistRes, err := client.GetGistTyped(gistIdStr)
 		if err != nil {
 			continue
 		}
@@ -70,15 +71,10 @@ func main() {
 			handler.GetDocumentHandler(w, r)
 		case http.MethodPost:
 			handler.CreateDocumentHandler(w, r)
-		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
-	mux.HandleFunc("/documents/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			handler.GetDocumentHandler(w, r)
+		case http.MethodPatch:
+			handler.UpdateDocumentHandler(w, r)
+		case http.MethodDelete:
+			handler.DeleteDocumentHandler(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

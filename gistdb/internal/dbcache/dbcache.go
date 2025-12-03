@@ -24,6 +24,27 @@ func fileThere(filePath string) bool {
 	return !errors.Is(err, os.ErrNotExist)
 }
 
+func writeFileCache(fileCacheMap map[string]any, cache *Cache) error {
+	// Serialize entire cache to JSON
+	bytes, err := json.MarshalIndent(fileCacheMap, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to encode cache: %w", err)
+	}
+
+	// Write JSON to file atomically
+	tmp := cache.filepath + ".tmp"
+
+	if err := os.WriteFile(tmp, bytes, 0644); err != nil {
+		return fmt.Errorf("failed to write tmp file: %w", err)
+	}
+
+	// Atomic rename
+	if err := os.Rename(tmp, cache.filepath); err != nil {
+		return fmt.Errorf("failed to replace cache file: %w", err)
+	}
+	return nil
+}
+
 // initialize a new Cache instance
 func NewCache(path string) *Cache {
 	return &Cache{
@@ -62,9 +83,6 @@ func (c *Cache) Set(key string, value any) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//fmt.Println("============")
-	//fmt.Println(string(fileCacheContent))
-	//fmt.Println("============")
 
 	//Unmarshal into a generic map
 	var fileCacheMap map[string]any
@@ -74,29 +92,15 @@ func (c *Cache) Set(key string, value any) error {
 	}
 	fileCacheMap[key] = value
 
-	// Serialize entire cache to JSON
-	bytes, err := json.MarshalIndent(fileCacheMap, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to encode cache: %w", err)
-	}
-
-	// Write JSON to file atomically
-	tmp := c.filepath + ".tmp"
-
-	if err := os.WriteFile(tmp, bytes, 0644); err != nil {
-		return fmt.Errorf("failed to write tmp file: %w", err)
-	}
-
-	// Atomic rename
-	if err := os.Rename(tmp, c.filepath); err != nil {
-		return fmt.Errorf("failed to replace cache file: %w", err)
+	if err := writeFileCache(fileCacheMap, c); err != nil {
+		return err
 	}
 
 	return nil
 
 }
 
-func (c *Cache) Assign(value map[string]string) error {
+func (c *Cache) Assign(value map[string]any) error {
 	// overwrite cache with specified value
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -122,22 +126,8 @@ func (c *Cache) Assign(value map[string]string) error {
 
 	c.data = newData
 
-	// Serialize entire cache to JSON
-	bytes, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to encode cache: %w", err)
-	}
-
-	// Write JSON to file atomically
-	tmp := c.filepath + ".tmp"
-
-	if err := os.WriteFile(tmp, bytes, 0644); err != nil {
-		return fmt.Errorf("failed to write tmp file: %w", err)
-	}
-
-	// Atomic rename
-	if err := os.Rename(tmp, c.filepath); err != nil {
-		return fmt.Errorf("failed to replace cache file: %w", err)
+	if err := writeFileCache(value, c); err != nil {
+		return err
 	}
 
 	return nil
@@ -172,10 +162,36 @@ func (c *Cache) Get(key string) (any, bool) {
 	return item.Value, true
 }
 
-func (c *Cache) Delete(key string) {
+func (c *Cache) Delete(key string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.data, key)
+
+	if !fileThere(c.filepath) {
+		fmt.Printf("File '%s' does not exist.\n", c.filepath)
+		return nil
+	}
+
+	fileCacheContent, err := os.ReadFile(c.filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//Unmarshal into a generic map
+	var fileCacheMap map[string]any
+	err = json.Unmarshal([]byte(fileCacheContent), &fileCacheMap)
+	if err != nil {
+		return fmt.Errorf("Error unmarshaling to map: %w", err)
+	}
+
+	delete(fileCacheMap, key)
+
+	if err := writeFileCache(fileCacheMap, c); err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 func (c *Cache) Clear() {

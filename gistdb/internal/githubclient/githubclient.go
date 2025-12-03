@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"gistdb-as-a-service/gistdb/internal/dbcache"
 	"io"
 	"net/http"
 	"time"
@@ -20,12 +21,14 @@ type Gist struct {
 type GitHubClient struct {
 	httpClient *http.Client
 	token      string
+	dbCache    *dbcache.Cache
 }
 
-func NewGitHubClient(token string) *GitHubClient {
+func NewGitHubClient(token string, dbcache *dbcache.Cache) *GitHubClient {
 	return &GitHubClient{
 		httpClient: &http.Client{},
 		token:      token,
+		dbCache:    dbcache,
 	}
 }
 
@@ -64,10 +67,13 @@ func (c *GitHubClient) doGitHubRequest(method, url string, body io.Reader, out a
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("GitHub API returned status: %d", res.StatusCode)
 	}
 
+	if res.StatusCode == http.StatusNoContent {
+		return nil
+	}
 	if out != nil {
 		if err := json.NewDecoder(res.Body).Decode(out); err != nil {
 			return err
@@ -117,8 +123,8 @@ func (c *GitHubClient) GetGistTyped(gistID string) (Gist, error) {
 	return gist, nil
 }
 
-func ExtractGistNames(gists []map[string]any) map[string]string {
-	result := make(map[string]string)
+func ExtractGistNames(gists []map[string]any) map[string]any {
+	result := make(map[string]any)
 	for _, g := range gists {
 		id, ok := g["id"].(string)
 		if !ok {
@@ -180,16 +186,15 @@ func ConvertToGist(api gistAPIResponse) (Gist, error) {
 	return g, nil
 }
 
-func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[string]any, gists_map map[string]string) (map[string]any, error) {
+func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[string]any, collection string) (map[string]any, error) {
 	url := "https://api.github.com/gists/" + gistID
 	var out map[string]any
+	content["id"] = filename
+	content["collection"] = collection
+	content["modifiedAt"] = getTime()
 	jsonBytes, err := json.MarshalIndent(content, "", "  ")
 	if err != nil {
 		return nil, err
-	}
-	filename_from_map := gists_map[gistID]
-	if filename != filename_from_map {
-		return nil, fmt.Errorf("provided filename does not match recorded filename in database: %v", filename)
 	}
 
 	jsonString := string(jsonBytes)
@@ -209,6 +214,8 @@ func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[st
 		fmt.Printf("error here\n")
 		return nil, err
 	}
+
+	c.dbCache.Set(filename, content)
 
 	return out, nil
 }
@@ -243,6 +250,8 @@ func (c *GitHubClient) CreateGist(collection string, content map[string]any) (ma
 		return nil, err
 	}
 	out["customId"] = filename
+
+	c.dbCache.Set(filename, content)
 
 	return out, nil
 }
