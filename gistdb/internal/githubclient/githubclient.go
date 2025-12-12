@@ -24,11 +24,10 @@ type GitHubClient struct {
 	dbCache    *dbcache.Cache
 }
 
-func NewGitHubClient(token string, dbcache *dbcache.Cache) *GitHubClient {
+func NewGitHubClient(token string) *GitHubClient {
 	return &GitHubClient{
 		httpClient: &http.Client{},
 		token:      token,
-		dbCache:    dbcache,
 	}
 }
 
@@ -215,7 +214,7 @@ func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[st
 		return nil, err
 	}
 
-	c.dbCache.Set(filename, content)
+	out["contentData"] = content
 
 	return out, nil
 }
@@ -250,8 +249,7 @@ func (c *GitHubClient) CreateGist(collection string, content map[string]any) (ma
 		return nil, err
 	}
 	out["customId"] = filename
-
-	c.dbCache.Set(filename, content)
+	out["contentData"] = content
 
 	return out, nil
 }

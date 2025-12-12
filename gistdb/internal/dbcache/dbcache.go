@@ -24,7 +24,20 @@ func fileThere(filePath string) bool {
 	return !errors.Is(err, os.ErrNotExist)
 }
 
-func writeFileCache(fileCacheMap map[string]any, cache *Cache) error {
+func checkWriteFile(filepath string) {
+	// set data in file based memory cache
+	// create file if it does not exist
+	if fileThere(filepath) {
+		fmt.Printf("File '%s' exists.\n", filepath)
+	} else {
+		err := os.WriteFile(filepath, []byte("{}"), 0644)
+		if err != nil {
+			log.Fatalf("Error writing to file: %v", err)
+		}
+	}
+}
+
+func writeFileCache(fileCacheMap any, cache *Cache) error {
 	// Serialize entire cache to JSON
 	bytes, err := json.MarshalIndent(fileCacheMap, "", "  ")
 	if err != nil {
@@ -68,16 +81,7 @@ func (c *Cache) Set(key string, value any) error {
 		Value: value,
 	}
 
-	// set data in file based memory cache
-	// create file if it does not exist
-	if fileThere(c.filepath) {
-		fmt.Printf("File '%s' exists.\n", c.filepath)
-	} else {
-		err := os.WriteFile(c.filepath, []byte("{}"), 0644)
-		if err != nil {
-			log.Fatalf("Error writing to file: %v", err)
-		}
-	}
+	checkWriteFile(c.filepath)
 
 	fileCacheContent, err := os.ReadFile(c.filepath)
 	if err != nil {
@@ -100,21 +104,39 @@ func (c *Cache) Set(key string, value any) error {
 
 }
 
+func (c *Cache) SetIndexCache(key string, value any) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	checkWriteFile(c.filepath)
+
+	fileCacheContent, err := os.ReadFile(c.filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var fileCacheMap map[string]any
+	err = json.Unmarshal([]byte(fileCacheContent), &fileCacheMap)
+	if err != nil {
+		fmt.Println("Error unmarshaling to map:", err)
+	}
+
+	existingIds, ok := fileCacheMap[key]
+	if !ok {
+		return nil
+	}
+
+	fmt.Printf("CACHE INDEX: %#v\n", existingIds)
+
+	return nil
+}
+
 func (c *Cache) Assign(value map[string]any) error {
 	// overwrite cache with specified value
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// set data in file based memory cache
-	// create file if it does not exist
-	if fileThere(c.filepath) {
-		fmt.Printf("File '%s' exists.\n", c.filepath)
-	} else {
-		err := os.WriteFile(c.filepath, []byte("{}"), 0644)
-		if err != nil {
-			log.Fatalf("Error writing to file: %v", err)
-		}
-	}
+	checkWriteFile(c.filepath)
 
 	newData := make(map[string]CacheItem, len(value))
 
@@ -127,6 +149,45 @@ func (c *Cache) Assign(value map[string]any) error {
 	c.data = newData
 
 	if err := writeFileCache(value, c); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Cache) AssignIndexMap(value map[any][]string) error {
+	// overwrite cache with specified value for index map value
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !fileThere(c.filepath) {
+		if err := os.WriteFile(c.filepath, []byte("{}"), 0644); err != nil {
+			return fmt.Errorf("error creating cache file: %w", err)
+		}
+	}
+
+	newData := make(map[string]CacheItem, len(value))
+
+	for key, list := range value {
+		keyStr := fmt.Sprintf("%v", key) // convert any → string
+
+		newData[keyStr] = CacheItem{
+			Value: list,
+		}
+	}
+
+	c.data = newData
+
+	// cannot convert non-string keys to json, so serialize here in order to write to file
+	// go see's this "map[any][]string" as "map[interface {}][]string" so the key is of type
+	// interface which causes it to fail to write.
+	serializedIndexMap := make(map[string]any, len(newData))
+
+	for k, item := range newData {
+		serializedIndexMap[k] = item.Value
+	}
+
+	if err := writeFileCache(serializedIndexMap, c); err != nil {
 		return err
 	}
 

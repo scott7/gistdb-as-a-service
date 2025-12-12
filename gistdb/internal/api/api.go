@@ -22,10 +22,11 @@ type Handler struct {
 	Client     GithubClient
 	DBCache    *dbcache.Cache
 	FNameCache *dbcache.Cache
+	IndexCache *dbcache.Cache
 }
 
-func NewHandler(c GithubClient, dbc *dbcache.Cache, fnc *dbcache.Cache) *Handler {
-	return &Handler{Client: c, DBCache: dbc, FNameCache: fnc}
+func NewHandler(c GithubClient, dbc *dbcache.Cache, fnc *dbcache.Cache, inc *dbcache.Cache) *Handler {
+	return &Handler{Client: c, DBCache: dbc, FNameCache: fnc, IndexCache: inc}
 }
 
 func (h *Handler) CreateDocumentHandler(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +72,7 @@ func (h *Handler) CreateDocumentHandler(w http.ResponseWriter, r *http.Request) 
 	// set to filename cache
 	custom_id := out["customId"]
 	gist_id := out["id"]
+	content := out["contentData"]
 
 	custom_id_str, ok := custom_id.(string)
 	if !ok {
@@ -78,7 +80,7 @@ func (h *Handler) CreateDocumentHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	h.FNameCache.Set(custom_id_str, gist_id)
-	// DBCache set inside CreateGist()
+	h.DBCache.Set(custom_id_str, content)
 
 	json.NewEncoder(w).Encode(map[string]any{
 		"id": custom_id,
@@ -177,12 +179,15 @@ func (h *Handler) UpdateDocumentHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	doc, err := h.Client.UpdateGist(gistIDStr, id, payload, collection)
+	out, err := h.Client.UpdateGist(gistIDStr, id, payload, collection)
 	if err != nil {
 		http.Error(w, "unable to update document", http.StatusInternalServerError)
 		return
 	}
-	url := doc["url"]
+	url := out["url"]
+	content := out["contentData"]
+
+	h.DBCache.Set(id, content)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
