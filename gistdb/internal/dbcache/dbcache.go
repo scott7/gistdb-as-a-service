@@ -242,7 +242,7 @@ func (c *Cache) Delete(key string) error {
 	var fileCacheMap map[string]any
 	err = json.Unmarshal([]byte(fileCacheContent), &fileCacheMap)
 	if err != nil {
-		return fmt.Errorf("Error unmarshaling to map: %w", err)
+		return fmt.Errorf("error unmarshaling to map: %w", err)
 	}
 
 	delete(fileCacheMap, key)

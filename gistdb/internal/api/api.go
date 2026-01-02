@@ -3,15 +3,15 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"gistdb-as-a-service/gistdb/internal/common"
 	"gistdb-as-a-service/gistdb/internal/dbcache"
-	"gistdb-as-a-service/gistdb/internal/githubclient"
 	"net/http"
 	"strings"
 )
 
 type GithubClient interface {
 	CreateGist(collection string, content map[string]any) (map[string]any, error)
-	GetGistTyped(gistID string) (githubclient.Gist, error)
+	GetGistTyped(gistID string) (common.Gist, error)
 	ListGists() ([]map[string]any, error)
 	UpdateGist(gistID string, filename string, content map[string]any, collection string) (map[string]any, error)
 	DeleteGist(gistID string) (map[string]any, error)
@@ -119,15 +119,33 @@ func (h *Handler) GetDocumentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//cache_doc, ok := h.DBCache.Get(id)
-	//if !ok {
-	// not found
-	//}
+	var doc common.Gist
+	var err error
 
-	doc, err := h.Client.GetGistTyped(gist_id_str)
-	if err != nil {
-		http.Error(w, "document not found", http.StatusNotFound)
-		return
+	cache_doc, ok := h.DBCache.Get(id)
+	if ok {
+		// return cached content without touching github
+		cache_doc_converted, ok := cache_doc.(map[string]any)
+		if !ok {
+			http.Error(w, "error getting doc from cache", http.StatusInternalServerError)
+			return
+		}
+		// convert cache doc to Gist format type
+		doc = common.Gist{
+			GistID:  gist_id_str,
+			Content: make(map[string]any),
+		}
+		doc.Content = cache_doc_converted
+		doc.Name = id
+		fmt.Println("getting from cache doc: ", doc)
+	} else {
+		// reach out to github and get document
+		doc, err = h.Client.GetGistTyped(gist_id_str)
+		fmt.Println("getting from github: ", doc)
+		if err != nil {
+			http.Error(w, "document not found", http.StatusNotFound)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

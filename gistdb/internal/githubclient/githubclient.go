@@ -6,17 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"gistdb-as-a-service/gistdb/internal/common"
 	"gistdb-as-a-service/gistdb/internal/dbcache"
 	"io"
 	"net/http"
 	"time"
 )
-
-type Gist struct {
-	GistID  string         `json:"gist_id"`
-	Name    string         `json:"name"`
-	Content map[string]any `json:"content"`
-}
 
 type GitHubClient struct {
 	httpClient *http.Client
@@ -103,20 +98,20 @@ func (c *GitHubClient) GetGist(gistID string) (map[string]any, error) {
 	return out, nil
 }
 
-func (c *GitHubClient) GetGistTyped(gistID string) (Gist, error) {
+func (c *GitHubClient) GetGistTyped(gistID string) (common.Gist, error) {
 	raw, err := c.GetGist(gistID)
 	if err != nil {
-		return Gist{}, err
+		return common.Gist{}, err
 	}
 
 	api, err := parseGist(raw)
 	if err != nil {
-		return Gist{}, err
+		return common.Gist{}, err
 	}
 
 	gist, err := ConvertToGist(api)
 	if err != nil {
-		return Gist{}, err
+		return common.Gist{}, err
 	}
 
 	return gist, nil
@@ -158,8 +153,8 @@ func parseGist(raw map[string]any) (gistAPIResponse, error) {
 	return api, nil
 }
 
-func ConvertToGist(api gistAPIResponse) (Gist, error) {
-	g := Gist{
+func ConvertToGist(api gistAPIResponse) (common.Gist, error) {
+	g := common.Gist{
 		GistID:  api.GistID,
 		Content: make(map[string]any),
 	}
