@@ -3,10 +3,13 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"gistdb-as-a-service/gistdb/internal/common"
-	"gistdb-as-a-service/gistdb/internal/dbcache"
 	"net/http"
 	"strings"
+)
+
+import (
+	"gistdb-as-a-service/gistdb/internal/common"
+	"gistdb-as-a-service/gistdb/internal/dbcache"
 )
 
 type GithubClient interface {
@@ -67,7 +70,7 @@ func (h *Handler) CreateDocumentHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	fmt.Printf("output is woo %v\n\n", out)
+	//fmt.Printf("output is woo %v\n\n", out)
 
 	// set to filename cache
 	custom_id := out["customId"]

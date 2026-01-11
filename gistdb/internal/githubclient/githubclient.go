@@ -6,17 +6,20 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"gistdb-as-a-service/gistdb/internal/common"
-	"gistdb-as-a-service/gistdb/internal/dbcache"
 	"io"
 	"net/http"
 	"time"
 )
 
+import (
+	"gistdb-as-a-service/gistdb/internal/common"
+)
+
+const github_url string = "https://api.github.com/gists"
+
 type GitHubClient struct {
 	httpClient *http.Client
 	token      string
-	dbCache    *dbcache.Cache
 }
 
 func NewGitHubClient(token string) *GitHubClient {
@@ -78,9 +81,8 @@ func (c *GitHubClient) doGitHubRequest(method, url string, body io.Reader, out a
 }
 
 func (c *GitHubClient) ListGists() ([]map[string]any, error) {
-	url := "https://api.github.com/gists"
 	var out []map[string]any
-	if err := c.doGitHubRequest("GET", url, nil, &out); err != nil {
+	if err := c.doGitHubRequest("GET", github_url, nil, &out); err != nil {
 		return nil, err
 	}
 
@@ -88,7 +90,7 @@ func (c *GitHubClient) ListGists() ([]map[string]any, error) {
 }
 
 func (c *GitHubClient) GetGist(gistID string) (map[string]any, error) {
-	url := "https://api.github.com/gists/" + gistID
+	url := github_url + "/" + gistID
 
 	var out map[string]any
 	if err := c.doGitHubRequest("GET", url, nil, &out); err != nil {
@@ -181,7 +183,7 @@ func ConvertToGist(api gistAPIResponse) (common.Gist, error) {
 }
 
 func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[string]any, collection string) (map[string]any, error) {
-	url := "https://api.github.com/gists/" + gistID
+	url := github_url + "/" + gistID
 	var out map[string]any
 	content["id"] = filename
 	content["collection"] = collection
@@ -215,7 +217,6 @@ func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[st
 }
 
 func (c *GitHubClient) CreateGist(collection string, content map[string]any) (map[string]any, error) {
-	url := "https://api.github.com/gists"
 	var out map[string]any
 	filename := NewShortID()
 	content["id"] = filename
@@ -240,7 +241,7 @@ func (c *GitHubClient) CreateGist(collection string, content map[string]any) (ma
 		return nil, fmt.Errorf("error marshalling content: %w", err)
 	}
 	bodyReader := bytes.NewReader(jsonPayload)
-	if err := c.doGitHubRequest("POST", url, bodyReader, &out); err != nil {
+	if err := c.doGitHubRequest("POST", github_url, bodyReader, &out); err != nil {
 		return nil, err
 	}
 	out["customId"] = filename
@@ -250,7 +251,7 @@ func (c *GitHubClient) CreateGist(collection string, content map[string]any) (ma
 }
 
 func (c *GitHubClient) DeleteGist(gistID string) (map[string]any, error) {
-	url := "https://api.github.com/gists/" + gistID
+	url := github_url + "/" + gistID
 
 	var out map[string]any
 	if err := c.doGitHubRequest("DELETE", url, nil, &out); err != nil {

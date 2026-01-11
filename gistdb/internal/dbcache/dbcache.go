@@ -72,7 +72,8 @@ func (c *Cache) Set(key string, value any) error {
 
 	// clear in memory cache if we exceed a large number of items
 	length := len(c.data)
-	if length > 1000 {
+	// If cache exceeds 1 GB clear it
+	if length > 1073741824 {
 		c.data = make(map[string]CacheItem)
 	}
 
