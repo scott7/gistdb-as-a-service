@@ -38,6 +38,7 @@ All data is cached via write-through method with everything persisting in Github
 
 The documents stored in the gist are in json format and look like this:
 
+```json
 {
     "gist_id": "387ab96d8ade7a3792dc0ffd377ef3d8",
     "name": "3382f3024d37168d.json",
@@ -54,6 +55,7 @@ The documents stored in the gist are in json format and look like this:
         "id": "3382f3024d37168d.json"
     }
 }
+```
 
 The "data" field contains the values that the user sets. The filename of the gist is also the unique ID used by the service (in this case `3382f3024d37168d.json`.) The schema within the "data" field is agnostic for this service and can be whatever the calling service needs.
 
