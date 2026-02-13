@@ -9,11 +9,17 @@ import (
 
 import (
 	"gistdb-as-a-service/gistdb/internal/api"
+	"gistdb-as-a-service/gistdb/internal/auth"
 	"gistdb-as-a-service/gistdb/internal/dbcache"
 	"gistdb-as-a-service/gistdb/internal/githubclient"
 )
 
 func main() {
+	err := auth.InitJWT()
+	if err != nil {
+		log.Fatalf("JWT init failed: %v", err)
+	}
+
 	cache := dbcache.NewCache("/tmp/gocache.json")
 	filename_cache := dbcache.NewCache("/tmp/fnamecache.json")
 	index_cache := dbcache.NewCache("/tmp/index.json")
@@ -44,20 +50,15 @@ func main() {
 		if err != nil {
 			continue
 		}
-		//fmt.Printf("Setting gist in cache: %#v\n", gistRes.Content)
 		cache.Set(gistRes.Name, gistRes.Content)
-		//out, err := client.CreateGist("collection", gistRes.Content)
-		//fmt.Printf("out: %#v\n", out)
-		//fmt.Printf("error: %#v\n", err)
 		collection, ok := gistRes.Content["collection"]
 		if ok {
 			indexMap[collection] = append(indexMap[collection], gistRes.Name)
 		}
 
 	}
-	cache.Get("test_2")
 
-	fmt.Printf("indexMap: %#v\n", indexMap)
+	//fmt.Printf("indexMap: %#v\n", indexMap)
 
 	index_cache.AssignIndexMap(indexMap)
 
@@ -66,15 +67,6 @@ func main() {
 	handler := api.NewHandler(client, cache, filename_cache, index_cache)
 
 	mux := http.NewServeMux()
-
-	mux.HandleFunc("/collections", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			//handler.CreateDocumentHandler(w, r)
-		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
 
 	mux.HandleFunc("/collections/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -92,6 +84,6 @@ func main() {
 	})
 
 	log.Println("Server running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	log.Fatal(http.ListenAndServe(":8080", auth.Middleware(mux)))
 
 }
