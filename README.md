@@ -32,11 +32,34 @@ All data is cached via write-through method with everything persisting in Github
 
 1. Database Cache: This is an in memory cache to store the contents of all documents in the database. This is also using a write-through file based cache that the service will fall back to if the contents are not found in the in-memory cache. If the in memory cache exceeds a certain size it is cleared. The file-based cache will persist until the /tmp files are cleared (i.e. app is redeployed)
 2. Filename Cache: This is an in memory and file based cache to map unique document ID to github gist ID.
-3. Index Cache
+3. Index Cache: Maps collection names to arrays of document IDs for efficient collection queries.
+
+Each Cache object has a `ttl` attribute. This is defined when a cache is created:
+```go
+cache := dbcache.NewCache("/tmp/mycache.json", 20)
+```
+In this example all items in this cache have a ttl of 20 seconds. If that is set to 0 there is no expiration.
 
 ## Example
 
 The documents stored in the gist are in json format and look like this:
+
+```json
+{
+  "collection": "new_two",
+  "createdAt": "2025-11-30T22:48:31-05:00",
+  "data": {
+    "tags": [
+      "a",
+      "b"
+    ],
+    "title": "This is title"
+  },
+  "id": "3382f3024d37168d.json"
+}
+```
+
+The data returned from a GET document from the services API looks like this:
 
 ```json
 {
@@ -112,6 +135,7 @@ curl -X GET http://localhost:8080/collections/users/DOCUMENT_ID \
 |----------|----------|-------------|
 | `GITHUB_TOKEN` | Yes | GitHub Personal Access Token with `gist` scope |
 | `JWT_PUBLIC_KEY` | Yes | RSA public key in PEM format for JWT verification |
+| `DISABLE_AUTH` | No | Optional to disable JWT auth for local testing |
 
 ## JWT Authentication
 
@@ -134,6 +158,8 @@ Authorization: Bearer <your_jwt_token>
 # Set environment variables
 export GITHUB_TOKEN="your_token"
 export JWT_PUBLIC_KEY="$(cat public.pem)"
+# optional env var to disable JWT API authentication
+export DISABLE_AUTH=1
 
 # Run the application
 cd gistdb

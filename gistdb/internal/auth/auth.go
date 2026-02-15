@@ -16,6 +16,11 @@ import (
 var publicKey *rsa.PublicKey
 
 func InitJWT() error {
+	// Skip JWT initialization if auth is disabled
+	if os.Getenv("DISABLE_AUTH") == "1" {
+		return nil
+	}
+
 	keyData := os.Getenv("JWT_PUBLIC_KEY")
 	if keyData == "" {
 		return errors.New("JWT_PUBLIC_KEY not set")
@@ -32,6 +37,11 @@ func InitJWT() error {
 
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Bypass authentication if DISABLE_AUTH=1
+		if os.Getenv("DISABLE_AUTH") == "1" {
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {

@@ -20,9 +20,9 @@ func main() {
 		log.Fatalf("JWT init failed: %v", err)
 	}
 
-	cache := dbcache.NewCache("/tmp/gocache.json")
-	filename_cache := dbcache.NewCache("/tmp/fnamecache.json")
-	index_cache := dbcache.NewCache("/tmp/index.json")
+	cache := dbcache.NewCache("/tmp/gocache.json", 3600) // items expire in 1 hour
+	filename_cache := dbcache.NewCache("/tmp/fnamecache.json", 0)
+	index_cache := dbcache.NewCache("/tmp/index.json", 0)
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		log.Fatal("GITHUB_TOKEN environment variable is required")

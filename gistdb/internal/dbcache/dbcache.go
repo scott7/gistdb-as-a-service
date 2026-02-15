@@ -7,16 +7,22 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 )
 
+// ttl for cache is set per Cache object created.
+// A ttl value of 0 means there is no expiration.
+
 type CacheItem struct {
-	Value any
+	Value  any
+	Expiry time.Time
 }
 
 type Cache struct {
 	data     map[string]CacheItem
 	mu       sync.RWMutex
 	filepath string
+	ttl      int
 }
 
 func fileThere(filePath string) bool {
@@ -59,10 +65,11 @@ func writeFileCache(fileCacheMap any, cache *Cache) error {
 }
 
 // initialize a new Cache instance
-func NewCache(path string) *Cache {
+func NewCache(path string, ttl_value int) *Cache {
 	return &Cache{
 		data:     make(map[string]CacheItem),
 		filepath: path,
+		ttl:      ttl_value,
 	}
 }
 
@@ -77,9 +84,18 @@ func (c *Cache) Set(key string, value any) error {
 		c.data = make(map[string]CacheItem)
 	}
 
+	var expirationTime time.Time
+	if c.ttl == 0 {
+		// never expire
+		expirationTime = time.Time{}
+	} else {
+		expirationTime = time.Now().Add(time.Duration(c.ttl) * time.Second)
+	}
+
 	// set in memory cache
 	c.data[key] = CacheItem{
-		Value: value,
+		Value:  value,
+		Expiry: expirationTime,
 	}
 
 	checkWriteFile(c.filepath)
@@ -89,13 +105,17 @@ func (c *Cache) Set(key string, value any) error {
 		log.Fatal(err)
 	}
 
-	//Unmarshal into a generic map
-	var fileCacheMap map[string]any
+	//Unmarshal into a map of CacheItem
+	var fileCacheMap map[string]CacheItem
 	err = json.Unmarshal([]byte(fileCacheContent), &fileCacheMap)
 	if err != nil {
 		fmt.Println("Error unmarshaling to map:", err)
 	}
-	fileCacheMap[key] = value
+	// Store the full CacheItem with expiry in file cache
+	fileCacheMap[key] = CacheItem{
+		Value:  value,
+		Expiry: expirationTime,
+	}
 
 	if err := writeFileCache(fileCacheMap, c); err != nil {
 		return err
@@ -141,15 +161,25 @@ func (c *Cache) Assign(value map[string]any) error {
 
 	newData := make(map[string]CacheItem, len(value))
 
+	var expirationTime time.Time
+	if c.ttl == 0 {
+		// never expire
+		expirationTime = time.Time{}
+	} else {
+		expirationTime = time.Now().Add(time.Duration(c.ttl) * time.Second)
+	}
+
 	for key, val := range value {
 		newData[key] = CacheItem{
-			Value: val,
+			Value:  val,
+			Expiry: expirationTime,
 		}
 	}
 
 	c.data = newData
 
-	if err := writeFileCache(value, c); err != nil {
+	// Write CacheItems to file cache
+	if err := writeFileCache(newData, c); err != nil {
 		return err
 	}
 
@@ -167,28 +197,29 @@ func (c *Cache) AssignIndexMap(value map[any][]string) error {
 		}
 	}
 
+	var expirationTime time.Time
+	if c.ttl == 0 {
+		// never expire
+		expirationTime = time.Time{}
+	} else {
+		expirationTime = time.Now().Add(time.Duration(c.ttl) * time.Second)
+	}
+
 	newData := make(map[string]CacheItem, len(value))
 
 	for key, list := range value {
 		keyStr := fmt.Sprintf("%v", key) // convert any → string
 
 		newData[keyStr] = CacheItem{
-			Value: list,
+			Value:  list,
+			Expiry: expirationTime,
 		}
 	}
 
 	c.data = newData
 
-	// cannot convert non-string keys to json, so serialize here in order to write to file
-	// go see's this "map[any][]string" as "map[interface {}][]string" so the key is of type
-	// interface which causes it to fail to write.
-	serializedIndexMap := make(map[string]any, len(newData))
-
-	for k, item := range newData {
-		serializedIndexMap[k] = item.Value
-	}
-
-	if err := writeFileCache(serializedIndexMap, c); err != nil {
+	// Write CacheItems to file cache
+	if err := writeFileCache(newData, c); err != nil {
 		return err
 	}
 
@@ -207,26 +238,43 @@ func (c *Cache) Get(key string) (any, bool) {
 		if err != nil {
 			return nil, false
 		}
-		var fileCacheMap map[string]any
+		var fileCacheMap map[string]CacheItem
 		err = json.Unmarshal([]byte(fileCacheContent), &fileCacheMap)
 		if err != nil {
 			fmt.Println("Error unmarshaling to map:", err)
+			return nil, false
 		}
-		item, fileOk := fileCacheMap[key]
+		cacheItem, fileOk := fileCacheMap[key]
 		if !fileOk {
 			fmt.Printf("not found in file cache\n")
 			return nil, false
 		}
-		fmt.Printf("found in file cache: %v\n", item)
-		return item, true
+		fmt.Printf("found in file cache: %v\n", cacheItem)
+
+		// Check if item from file cache is expired
+		if !cacheItem.Expiry.IsZero() && cacheItem.Expiry.Before(time.Now()) {
+			fmt.Printf("item from file cache is expired\n")
+			// Remove from cache
+			c.deleteUnlocked(key)
+			return nil, false
+		}
+
+		// Add to in-memory cache and return from there
+		c.data[key] = cacheItem
+		item = cacheItem
+	}
+	if !item.Expiry.IsZero() && item.Expiry.Before(time.Now()) {
+		// remove expired entry from both in-memory and file cache
+		c.deleteUnlocked(key)
+		return nil, false
 	}
 	//fmt.Printf("found in file in memory cache: %v\n", item)
 	return item.Value, true
 }
 
-func (c *Cache) Delete(key string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (c *Cache) deleteUnlocked(key string) error {
+	// helper functino to delete cache - assumes mutex is unlocked.
+	fmt.Printf("removing item from cache\n")
 	delete(c.data, key)
 
 	if !fileThere(c.filepath) {
@@ -239,8 +287,8 @@ func (c *Cache) Delete(key string) error {
 		log.Fatal(err)
 	}
 
-	//Unmarshal into a generic map
-	var fileCacheMap map[string]any
+	//Unmarshal into a map of CacheItem
+	var fileCacheMap map[string]CacheItem
 	err = json.Unmarshal([]byte(fileCacheContent), &fileCacheMap)
 	if err != nil {
 		return fmt.Errorf("error unmarshaling to map: %w", err)
@@ -253,7 +301,12 @@ func (c *Cache) Delete(key string) error {
 	}
 
 	return nil
+}
 
+func (c *Cache) Delete(key string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.deleteUnlocked(key)
 }
 
 func (c *Cache) Clear() {

@@ -149,6 +149,7 @@ func (h *Handler) GetDocumentHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "document not found", http.StatusNotFound)
 			return
 		}
+		h.DBCache.Set(id, doc.Content)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
