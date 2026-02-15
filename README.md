@@ -80,7 +80,7 @@ The data returned from a GET document from the services API looks like this:
 }
 ```
 
-The "data" field contains the values that the user sets. The filename of the gist is also the unique ID used by the service (in this case `3382f3024d37168d.json`.) The schema within the "data" field is agnostic for this service and can be whatever the calling service needs.
+The "data" field contains the values that the user sets. The "name" field (_not_ the gist filename) of the item is also the unique ID used by the service (in this case `3382f3024d37168d.json`.) The schema within the "data" field is agnostic for this service and can be whatever the calling service needs.
 
 
 ## Quickstart with Docker
