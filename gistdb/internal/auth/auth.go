@@ -69,19 +69,16 @@ func Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Validate issuer
 		if claims["iss"] != "node-api" {
 			http.Error(w, "Invalid issuer", http.StatusUnauthorized)
 			return
 		}
 
-		// Validate audience
 		if claims["aud"] != "go-db-service" {
 			http.Error(w, "Invalid audience", http.StatusUnauthorized)
 			return
 		}
 
-		// Validate expiration
 		exp, ok := claims["exp"].(float64)
 		if !ok || time.Now().Unix() > int64(exp) {
 			http.Error(w, "Token expired", http.StatusUnauthorized)

@@ -86,7 +86,6 @@ func (c *Cache) Set(key string, value any) error {
 
 	var expirationTime time.Time
 	if c.ttl == 0 {
-		// never expire
 		expirationTime = time.Time{}
 	} else {
 		expirationTime = time.Now().Add(time.Duration(c.ttl) * time.Second)
@@ -111,7 +110,7 @@ func (c *Cache) Set(key string, value any) error {
 	if err != nil {
 		fmt.Println("Error unmarshaling to map:", err)
 	}
-	// Store the full CacheItem with expiry in file cache
+
 	fileCacheMap[key] = CacheItem{
 		Value:  value,
 		Expiry: expirationTime,
@@ -163,7 +162,6 @@ func (c *Cache) Assign(value map[string]any) error {
 
 	var expirationTime time.Time
 	if c.ttl == 0 {
-		// never expire
 		expirationTime = time.Time{}
 	} else {
 		expirationTime = time.Now().Add(time.Duration(c.ttl) * time.Second)
@@ -178,7 +176,6 @@ func (c *Cache) Assign(value map[string]any) error {
 
 	c.data = newData
 
-	// Write CacheItems to file cache
 	if err := writeFileCache(newData, c); err != nil {
 		return err
 	}
@@ -199,7 +196,6 @@ func (c *Cache) AssignIndexMap(value map[any][]string) error {
 
 	var expirationTime time.Time
 	if c.ttl == 0 {
-		// never expire
 		expirationTime = time.Time{}
 	} else {
 		expirationTime = time.Now().Add(time.Duration(c.ttl) * time.Second)
@@ -208,7 +204,7 @@ func (c *Cache) AssignIndexMap(value map[any][]string) error {
 	newData := make(map[string]CacheItem, len(value))
 
 	for key, list := range value {
-		keyStr := fmt.Sprintf("%v", key) // convert any → string
+		keyStr := fmt.Sprintf("%v", key) // convert any to string
 
 		newData[keyStr] = CacheItem{
 			Value:  list,
@@ -218,7 +214,6 @@ func (c *Cache) AssignIndexMap(value map[any][]string) error {
 
 	c.data = newData
 
-	// Write CacheItems to file cache
 	if err := writeFileCache(newData, c); err != nil {
 		return err
 	}
@@ -254,7 +249,6 @@ func (c *Cache) Get(key string) (any, bool) {
 		// Check if item from file cache is expired
 		if !cacheItem.Expiry.IsZero() && cacheItem.Expiry.Before(time.Now()) {
 			fmt.Printf("item from file cache is expired\n")
-			// Remove from cache
 			c.deleteUnlocked(key)
 			return nil, false
 		}
@@ -264,7 +258,6 @@ func (c *Cache) Get(key string) (any, bool) {
 		item = cacheItem
 	}
 	if !item.Expiry.IsZero() && item.Expiry.Before(time.Now()) {
-		// remove expired entry from both in-memory and file cache
 		c.deleteUnlocked(key)
 		return nil, false
 	}

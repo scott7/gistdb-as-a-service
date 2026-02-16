@@ -20,7 +20,8 @@ func main() {
 		log.Fatalf("JWT init failed: %v", err)
 	}
 
-	cache := dbcache.NewCache("/tmp/gocache.json", 3600) // items expire in 1 hour
+	// cache items expire in 1 hour, is set to 0 never expire
+	cache := dbcache.NewCache("/tmp/gocache.json", 3600)
 	filename_cache := dbcache.NewCache("/tmp/fnamecache.json", 0)
 	index_cache := dbcache.NewCache("/tmp/index.json", 0)
 	token := os.Getenv("GITHUB_TOKEN")
@@ -55,14 +56,11 @@ func main() {
 		if ok {
 			indexMap[collection] = append(indexMap[collection], gistRes.Name)
 		}
-
 	}
 
 	//fmt.Printf("indexMap: %#v\n", indexMap)
 
 	index_cache.AssignIndexMap(indexMap)
-
-	// Initialize API
 
 	handler := api.NewHandler(client, cache, filename_cache, index_cache)
 

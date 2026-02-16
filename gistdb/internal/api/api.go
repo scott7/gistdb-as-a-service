@@ -142,7 +142,7 @@ func (h *Handler) GetDocumentHandler(w http.ResponseWriter, r *http.Request) {
 		doc.Name = id
 		fmt.Println("getting from cache doc: ", doc)
 	} else {
-		// reach out to github and get document
+		// cache miss - reach out to github and get document
 		doc, err = h.Client.GetGistTyped(gist_id_str)
 		fmt.Println("getting from github: ", doc)
 		if err != nil {

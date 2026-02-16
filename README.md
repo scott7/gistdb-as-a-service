@@ -30,9 +30,9 @@ There are multiple caches for this service:
 
 All data is cached via write-through method with everything persisting in Github.
 
-1. Database Cache: This is an in memory cache to store the contents of all documents in the database. This is also using a write-through file based cache that the service will fall back to if the contents are not found in the in-memory cache. If the in memory cache exceeds a certain size it is cleared. The file-based cache will persist until the /tmp files are cleared (i.e. app is redeployed)
-2. Filename Cache: This is an in memory and file based cache to map unique document ID to github gist ID.
-3. Index Cache: Maps collection names to arrays of document IDs for efficient collection queries.
+1. Database Cache: This is an in memory cache to store the contents of all documents in the database. This is also using a write-through file based cache that the service will fall back to if the contents are not found in the in-memory cache. If the in memory cache exceeds a certain size it is cleared. The file-based cache will persist until the /tmp files are cleared (i.e. app is redeployed) (`default cache ttl 1 hour`)
+2. Filename Cache: This is an in memory and file based cache to map unique document ID to github gist ID. (`no cache expiration here`)
+3. Index Cache: Maps collection names to arrays of document IDs for efficient collection queries. (`no cache expiration here`)
 
 Each Cache object has a `ttl` attribute. This is defined when a cache is created:
 ```go
