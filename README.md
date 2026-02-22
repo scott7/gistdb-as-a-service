@@ -2,6 +2,9 @@
 
 A lightweight document database service that uses GitHub Gists as a backend storage layer. Built with Go, it provides a RESTful API for managing collections and documents with JWT authentication.
 
+![Go](https://img.shields.io/badge/Go-%2300ADD8.svg?&logo=go&logoColor=white)
+![Fly.io](https://img.shields.io/badge/Fly.io-8636EA?logo=flydotio&logoColor=white)
+
 ## Notice
 
 This is a personal and educational project only. This is not intended to be a fully functioning or secure DB service.
