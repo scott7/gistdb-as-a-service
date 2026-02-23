@@ -279,9 +279,8 @@ func (h *Handler) DeleteDocumentHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	collectionFromDoc := doc.Content["collection"]
-
-	if collectionFromDoc != collection {
+	collectionFromDoc, ok := doc.Content["collection"].(string)
+	if !ok || collectionFromDoc != collection {
 		http.Error(w, "collection provided does not match document", http.StatusBadRequest)
 		return
 	}
