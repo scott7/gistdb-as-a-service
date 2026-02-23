@@ -32,6 +32,23 @@ func NewHandler(c GithubClient, dbc *dbcache.Cache, fnc *dbcache.Cache, inc *dbc
 	return &Handler{Client: c, DBCache: dbc, FNameCache: fnc, IndexCache: inc}
 }
 
+func (h *Handler) ListCollectionHandler(w http.ResponseWriter, r *http.Request) {
+	collection := strings.TrimPrefix(r.URL.Path, "/collections/")
+	collection = strings.TrimSuffix(collection, "/")
+	if collection == "" {
+		http.Error(w, "missing collection name", http.StatusBadRequest)
+		return
+	}
+
+	ids, _ := h.IndexCache.GetStrings(collection)
+	if ids == nil {
+		ids = []string{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"ids": ids})
+}
+
 func (h *Handler) CreateDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -84,6 +101,10 @@ func (h *Handler) CreateDocumentHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	h.FNameCache.Set(custom_id_str, gist_id)
 	h.DBCache.Set(custom_id_str, content)
+
+	// update index cache so the new document appears
+	existingIDs, _ := h.IndexCache.GetStrings(collection)
+	h.IndexCache.Set(collection, append(existingIDs, custom_id_str))
 
 	json.NewEncoder(w).Encode(map[string]any{
 		"id": custom_id,
@@ -273,6 +294,17 @@ func (h *Handler) DeleteDocumentHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	h.DBCache.Delete(id)
 	h.FNameCache.Delete(id)
+
+	// remove id from index cache
+	if existing, ok := h.IndexCache.GetStrings(collection); ok {
+		filtered := make([]string, 0, len(existing))
+		for _, s := range existing {
+			if s != id {
+				filtered = append(filtered, s)
+			}
+		}
+		h.IndexCache.Set(collection, filtered)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{

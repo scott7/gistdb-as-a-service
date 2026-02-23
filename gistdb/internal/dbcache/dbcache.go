@@ -124,33 +124,6 @@ func (c *Cache) Set(key string, value any) error {
 
 }
 
-func (c *Cache) SetIndexCache(key string, value any) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	checkWriteFile(c.filepath)
-
-	fileCacheContent, err := os.ReadFile(c.filepath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var fileCacheMap map[string]any
-	err = json.Unmarshal([]byte(fileCacheContent), &fileCacheMap)
-	if err != nil {
-		fmt.Println("Error unmarshaling to map:", err)
-	}
-
-	existingIds, ok := fileCacheMap[key]
-	if !ok {
-		return nil
-	}
-
-	fmt.Printf("CACHE INDEX: %#v\n", existingIds)
-
-	return nil
-}
-
 func (c *Cache) Assign(value map[string]any) error {
 	// overwrite cache with specified value
 	c.mu.Lock()
@@ -263,6 +236,29 @@ func (c *Cache) Get(key string) (any, bool) {
 	}
 	//fmt.Printf("found in file in memory cache: %v\n", item)
 	return item.Value, true
+}
+
+func (c *Cache) GetStrings(key string) ([]string, bool) {
+	// GetStrings retrieves a value as []string, handling the []interface{} that
+	// json.Unmarshal produces when deserializing from the file cache.
+	// used for IndexCache
+	val, ok := c.Get(key)
+	if !ok {
+		return nil, false
+	}
+	switch v := val.(type) {
+	case []string:
+		return v, true
+	case []interface{}:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out, true
+	}
+	return nil, false
 }
 
 func (c *Cache) deleteUnlocked(key string) error {

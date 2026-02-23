@@ -1,6 +1,6 @@
 # GistDB as a Service
 
-A lightweight document database service that uses GitHub Gists as a backend storage layer. Built with Go, it provides a RESTful API for managing collections and documents with JWT authentication.
+A custom document database service that uses GitHub Gists as a backend storage layer. Built with Go, it uses a RESTful API for managing collections and documents with JWT authentication. Uses caching by default for improved performance.
 
 ![Go](https://img.shields.io/badge/Go-%2300ADD8.svg?&logo=go&logoColor=white)
 ![Fly.io](https://img.shields.io/badge/Fly.io-8636EA?logo=flydotio&logoColor=white)
@@ -18,14 +18,6 @@ GistDB transforms GitHub Gists into a simple document database, offering:
 - **JWT Authentication**: Secure access with RSA-signed tokens
 - **Caching layer**: In-memory and file based caching for improved performance
 - **GitHub-backed**: All data persisted as GitHub Gists
-
-## Features
-
-- Create, read, update, and delete documents
-- Collection-based organization
-- JWT authentication with issuer/audience validation
-- Automatic indexing of collections
-- Local caching for faster reads
 
 ## Cache
 
@@ -128,6 +120,7 @@ curl -X GET http://localhost:8080/collections/users/DOCUMENT_ID \
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/collections/{collection}` | Create a new document |
+| `GET`  | `/collections/{collection}` | list all documents in collection |
 | `GET` | `/collections/{collection}/{id}` | Retrieve a document |
 | `PATCH` | `/collections/{collection}/{id}` | Update a document |
 | `DELETE` | `/collections/{collection}/{id}` | Delete a document |

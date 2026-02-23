@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 import (
@@ -69,7 +70,14 @@ func main() {
 	mux.HandleFunc("/collections/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			handler.GetDocumentHandler(w, r)
+			// GET /collections/{collection} vs GET /collections/{collection}/{id}
+			path := strings.TrimPrefix(r.URL.Path, "/collections/")
+			parts := strings.SplitN(strings.TrimSuffix(path, "/"), "/", 2)
+			if len(parts) == 2 && parts[1] != "" {
+				handler.GetDocumentHandler(w, r)
+			} else {
+				handler.ListCollectionHandler(w, r)
+			}
 		case http.MethodPost:
 			handler.CreateDocumentHandler(w, r)
 		case http.MethodPatch:
