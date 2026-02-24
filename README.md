@@ -3,7 +3,7 @@
 A custom document database service that uses GitHub Gists as a backend storage layer. Built with Go, it uses a RESTful API for managing collections and documents with JWT authentication. Uses caching by default for improved performance.
 
 ![Go](https://img.shields.io/badge/Go-%2300ADD8.svg?&logo=go&logoColor=white)
-![Fly.io](https://img.shields.io/badge/Fly.io-8636EA?logo=flydotio&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=fff)
 
 ## Notice
 
