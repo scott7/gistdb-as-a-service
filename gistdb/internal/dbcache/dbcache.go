@@ -34,7 +34,7 @@ func checkWriteFile(filepath string) {
 	// set data in file based memory cache
 	// create file if it does not exist
 	if fileThere(filepath) {
-		fmt.Printf("File '%s' exists.\n", filepath)
+		// do nothing
 	} else {
 		err := os.WriteFile(filepath, []byte("{}"), 0644)
 		if err != nil {
