@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 import (
@@ -15,26 +16,10 @@ import (
 	"gistdb-as-a-service/gistdb/internal/githubclient"
 )
 
-func main() {
-	err := auth.InitJWT()
-	if err != nil {
-		log.Fatalf("JWT init failed: %v", err)
-	}
-
-	// cache items expire in 1 hour, is set to 0 never expire
-	cache := dbcache.NewCache("/tmp/gocache.json", 3600)
-	filename_cache := dbcache.NewCache("/tmp/fnamecache.json", 0)
-	index_cache := dbcache.NewCache("/tmp/index.json", 0)
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		log.Fatal("GITHUB_TOKEN environment variable is required")
-	}
-
-	client := githubclient.NewGitHubClient(token)
-
+func populateCaches(client api.GithubClient, cache, filename_cache, index_cache *dbcache.Cache) error {
 	gists, err := client.ListGists()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	gists_map := githubclient.ExtractGistNames(gists)
@@ -59,9 +44,42 @@ func main() {
 		}
 	}
 
-	//fmt.Printf("indexMap: %#v\n", indexMap)
-
 	index_cache.AssignIndexMap(indexMap)
+
+	return nil
+}
+
+func main() {
+	err := auth.InitJWT()
+	if err != nil {
+		log.Fatalf("JWT init failed: %v", err)
+	}
+
+	// cache items expire in 1 hour, if set to 0 never expire
+	cache := dbcache.NewCache("/tmp/gocache.json", 3600)
+	filename_cache := dbcache.NewCache("/tmp/fnamecache.json", 0)
+	index_cache := dbcache.NewCache("/tmp/index.json", 0)
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		log.Fatal("GITHUB_TOKEN environment variable is required")
+	}
+
+	client := githubclient.NewGitHubClient(token)
+
+	if err := populateCaches(client, cache, filename_cache, index_cache); err != nil {
+		log.Fatal(err)
+	}
+
+	// background refresh cache every 15 minutes (instead of relying on restart)
+	go func() {
+		ticker := time.NewTicker(15 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := populateCaches(client, cache, filename_cache, index_cache); err != nil {
+				log.Printf("cache refresh failed: %v", err)
+			}
+		}
+	}()
 
 	handler := api.NewHandler(client, cache, filename_cache, index_cache)
 
