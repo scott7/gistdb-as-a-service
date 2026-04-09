@@ -406,7 +406,19 @@ func main() {
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", logoutHandler)
 	mux.Handle("/token", requireSession(http.HandlerFunc(tokenHandler)))
-	mux.Handle("/", requireSession(http.FileServer(http.Dir("."))))
+	blocked := map[string]bool{
+		"/main.go":    true,
+		"/README.md":  true,
+		"/readme.md":  true,
+	}
+	fileServer := http.FileServer(http.Dir("."))
+	mux.Handle("/", requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if blocked[r.URL.Path] {
+			http.NotFound(w, r)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})))
 
 	cert, err := generateSelfSignedCert()
 	if err != nil {

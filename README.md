@@ -35,6 +35,8 @@ cache := dbcache.NewCache("/tmp/mycache.json", 20)
 ```
 In this example all items in this cache have a ttl of 20 seconds. If that is set to 0 there is no expiration.
 
+The service will rebuild the index, filename, and DB caches every 15 minutes.
+
 ## Example
 
 The documents stored in the gist are in json format and look like this:
