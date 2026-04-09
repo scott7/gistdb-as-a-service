@@ -6,3 +6,9 @@ services:
     environment:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY}
+    networks:
+        - tunnel-net
+
+networks:
+  tunnel-net:
+    external: true

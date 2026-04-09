@@ -372,6 +372,11 @@ func main() {
 	newUser := flag.String("add-user", "", "add or update a user in the credentials file and exit")
 	flag.Parse()
 
+	serviceURL := os.Getenv("GISTDB_SERVICE_URL")
+	if serviceURL == "" {
+		serviceURL = "http://localhost:8085"
+	}
+
 	if *newUser != "" {
 		addUser(*credsPath, *newUser)
 		return
@@ -411,10 +416,16 @@ func main() {
 		"/README.md":  true,
 		"/readme.md":  true,
 	}
+	indexTmpl := template.Must(template.ParseFiles("index.html"))
 	fileServer := http.FileServer(http.Dir("."))
 	mux.Handle("/", requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if blocked[r.URL.Path] {
 			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			indexTmpl.Execute(w, map[string]string{"ServiceURL": serviceURL})
 			return
 		}
 		fileServer.ServeHTTP(w, r)
