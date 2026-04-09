@@ -373,7 +373,8 @@
     </div>
     <div class="modal-field">
       <label for="modal-data">Data (JSON)</label>
-      <textarea id="modal-data" spellcheck="false">{}</textarea>
+      <textarea id="modal-data" spellcheck="false"></textarea>
+      <button class="btn btn-secondary" style="margin-top:6px;font-size:12px" onclick="applyStringify('modal-data', this)">Convert to JSON string</button>
     </div>
     <div id="modal-actions">
       <button class="btn btn-secondary" onclick="closeNewDocModal()">Cancel</button>
@@ -547,6 +548,7 @@
       <div id="data-section">
         <label for="data-editor">data</label>
         <textarea id="data-editor" spellcheck="false">${escHtml(JSON.stringify(content.data ?? {}, null, 2))}</textarea>
+        <button class="btn btn-secondary" style="margin-top:6px;font-size:12px" onclick="applyStringify('data-editor', this)">Convert to JSON string</button>
       </div>
       <div id="doc-actions">
         <button class="btn btn-primary" onclick="saveDocument()">Save</button>
@@ -622,6 +624,15 @@
       .replace(/"/g, '&quot;');
   }
 
+  // JSON stringify helper
+
+  function applyStringify(textareaId, btn) {
+    const ta = document.getElementById(textareaId);
+    ta.value = JSON.stringify(ta.value);
+    btn.disabled = true;
+    btn.textContent = 'Converted';
+  }
+
   // New document modal
 
   function showCreatedModal(id, col) {
@@ -636,7 +647,7 @@
 
   function openNewDocModal() {
     document.getElementById('modal-collection').value = currentCollection || '';
-    document.getElementById('modal-data').value = '{}';
+    document.getElementById('modal-data').value = '';
     document.getElementById('modal-overlay').classList.add('open');
     document.getElementById('modal-collection').focus();
   }
