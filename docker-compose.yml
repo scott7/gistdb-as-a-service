@@ -1,0 +1,8 @@
+services:
+  gistdb:
+    build: .
+    ports:
+      - "8085:8085"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY}

@@ -23,7 +23,7 @@ WORKDIR /app
 COPY --from=builder /app/gistdb-service .
 
 # Expose the application port
-EXPOSE 8080
+EXPOSE 8085
 
 # Run the application
 CMD ["./gistdb-service"]

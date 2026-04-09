@@ -130,7 +130,7 @@ func main() {
 		}
 	})
 
-	log.Println("Server running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", corsMiddleware(auth.Middleware(mux))))
+	log.Println("Server running on :8085")
+	log.Fatal(http.ListenAndServe(":8085", corsMiddleware(auth.Middleware(mux))))
 
 }

@@ -2,6 +2,9 @@
 
 A custom document database service that uses GitHub Gists as a backend storage layer. Built with Go, it uses a RESTful API for managing collections and documents with JWT authentication. Uses caching by default for improved performance.
 
+https://github.com/scott7/gistdb-as-a-service
+
+
 ![Go](https://img.shields.io/badge/Go-%2300ADD8.svg?&logo=go&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=fff)
 
@@ -125,7 +128,7 @@ docker build -t gistdb-service .
 ### 2. Run the container
 
 ```bash
-docker run -p 8080:8080 \
+docker run -p 8085:8085 \
   -e GITHUB_TOKEN="your_github_token_here" \
   -e JWT_PUBLIC_KEY="$(cat public.pem)" \
   gistdb-service
@@ -135,13 +138,13 @@ docker run -p 8080:8080 \
 
 ```bash
 # Create a document (requires valid JWT token)
-curl -X POST http://localhost:8080/collections/users \
+curl -X POST http://localhost:8085/collections/users \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"data": {"name": "Jane", "email": "jane@example.com"}}'
 
 # Get a document
-curl -X GET http://localhost:8080/collections/users/DOCUMENT_ID \
+curl -X GET http://localhost:8085/collections/users/DOCUMENT_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
