@@ -298,13 +298,25 @@ func (c *Cache) Delete(key string) error {
 	return c.deleteUnlocked(key)
 }
 
+func (c *Cache) Keys() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	keys := make([]string, 0, len(c.data))
+	for k := range c.data {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 func (c *Cache) Clear() {
+	fmt.Printf("Clearing memory cache\n")
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.data = make(map[string]CacheItem)
 }
 
 func (c *Cache) ClearFile() {
+	fmt.Printf("Clearing file cache\n")
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	os.Remove(c.filepath)

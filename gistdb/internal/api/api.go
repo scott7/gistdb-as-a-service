@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -30,6 +31,13 @@ type Handler struct {
 
 func NewHandler(c GithubClient, dbc *dbcache.Cache, fnc *dbcache.Cache, inc *dbcache.Cache) *Handler {
 	return &Handler{Client: c, DBCache: dbc, FNameCache: fnc, IndexCache: inc}
+}
+
+func (h *Handler) ListCollectionsHandler(w http.ResponseWriter, r *http.Request) {
+	collections := h.IndexCache.Keys()
+	sort.Strings(collections)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"collections": collections})
 }
 
 func (h *Handler) ListCollectionHandler(w http.ResponseWriter, r *http.Request) {
@@ -303,6 +311,20 @@ func (h *Handler) DeleteDocumentHandler(w http.ResponseWriter, r *http.Request) 
 		h.IndexCache.Set(collection, filtered)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"message": "success",
+	})
+}
+
+func (h *Handler) ClearCacheHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	h.DBCache.Clear()
+	h.DBCache.ClearFile()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"message": "success",

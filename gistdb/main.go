@@ -7,14 +7,25 @@ import (
 	"os"
 	"strings"
 	"time"
-)
 
-import (
 	"gistdb-as-a-service/gistdb/internal/api"
 	"gistdb-as-a-service/gistdb/internal/auth"
 	"gistdb-as-a-service/gistdb/internal/dbcache"
 	"gistdb-as-a-service/gistdb/internal/githubclient"
 )
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 func populateCaches(client api.GithubClient, cache, filename_cache, index_cache *dbcache.Cache) error {
 	gists, err := client.ListGists()
@@ -85,6 +96,18 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("/collections_list", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			handler.ListCollectionsHandler(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc("/clear_cache", func(w http.ResponseWriter, r *http.Request) {
+		handler.ClearCacheHandler(w, r)
+	})
+
 	mux.HandleFunc("/collections/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -108,6 +131,6 @@ func main() {
 	})
 
 	log.Println("Server running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", auth.Middleware(mux)))
+	log.Fatal(http.ListenAndServe(":8080", corsMiddleware(auth.Middleware(mux))))
 
 }

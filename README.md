@@ -23,7 +23,7 @@ GistDB transforms GitHub Gists into a simple document database, offering:
 
 There are multiple caches for this service:
 
-All data is cached via write-through method with everything persisting in Github.
+All data is cached via write-through method with everything persisting in GitHub.
 
 1. Database Cache: This is an in memory cache to store the contents of all documents in the database. This is also using a write-through file based cache that the service will fall back to if the contents are not found in the in-memory cache. If the in memory cache exceeds a certain size it is cleared. The file-based cache will persist until the /tmp files are cleared (i.e. app is redeployed) (`default cache ttl 1 hour`)
 2. Filename Cache: This is an in memory and file based cache to map unique document ID to github gist ID. (`no cache expiration here`)
@@ -77,6 +77,34 @@ The data returned from a GET document from the services API looks like this:
 
 The "data" field contains the values that the user sets. The "name" field (_not_ the gist filename) of the item is also the unique ID used by the service (in this case `3382f3024d37168d.json`.) The schema within the "data" field is agnostic for this service and can be whatever the calling service needs.
 
+## Client
+
+There is small admin utility "GistDB Admin" web page that is useful for adding, viewing, editing, and deleting documents. This is not intended to be user / Internet facing and is launched separately from the main service. This requires registering a local user and authenticating via the webpage.
+
+This utility can be found in the client directory. 
+
+To add a user run:
+
+```
+cd client
+go run . --add-user myuser
+<follow prompt to set password>
+```
+
+To run the application:
+
+```
+export JWT_PRIVATE_KEY="$(base64 -i private.pem)"
+cd client
+go run main.go
+view in browser at https://localhost:8081
+```
+
+See [client/README.md](client/README.md) for more details.
+
+![GistDB Admin UI](docs/db_admin_edit.png)
+
+![GistDB Admin login](docs/db_login.png)
 
 ## Quickstart with Docker
 
@@ -120,7 +148,7 @@ curl -X GET http://localhost:8080/collections/users/DOCUMENT_ID \
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/collections/{collection}` | Create a new document |
-| `GET`  | `/collections/{collection}` | list all documents in collection |
+| `GET`  | `/collections/{collection}` | List all documents in collection |
 | `GET` | `/collections/{collection}/{id}` | Retrieve a document |
 | `PATCH` | `/collections/{collection}/{id}` | Update a document |
 | `DELETE` | `/collections/{collection}/{id}` | Delete a document |

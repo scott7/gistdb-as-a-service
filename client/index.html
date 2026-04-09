@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GistDB Admin</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a1a'/><path d='M7 11v10c0 2.2 4 4 9 4s9-1.8 9-4V11' fill='%232563eb'/><ellipse cx='16' cy='11' rx='9' ry='3.5' fill='%233b82f6'/><ellipse cx='16' cy='17' rx='9' ry='3.5' fill='none' stroke='%2393c5fd' stroke-width='1.2'/><ellipse cx='16' cy='21' rx='9' ry='3.5' fill='%231d4ed8'/></svg>">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    background: #f5f5f5;
+    color: #1a1a1a;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    margin-right: 8px;
+  }
+
+  header label {
+    font-size: 12px;
+    color: #aaa;
+    white-space: nowrap;
+  }
+
+  header input {
+    background: #2e2e2e;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #fff;
+    padding: 4px 8px;
+    font-size: 13px;
+    height: 30px;
+  }
+
+  #input-baseurl { width: 200px; }
+  #input-token   { width: 260px; }
+
+  header input:focus { outline: none; border-color: #888; }
+
+  .btn {
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 5px 12px;
+    height: 30px;
+    white-space: nowrap;
+  }
+
+  .btn-primary   { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-danger    { background: #ef4444; color: #fff; }
+  .btn-danger:hover  { background: #dc2626; }
+  .btn-secondary { background: #e5e7eb; color: #1a1a1a; }
+  .btn-secondary:hover { background: #d1d5db; }
+
+  #toolbar {
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  #toolbar label { color: #555; font-size: 13px; }
+
+  #input-collection {
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 13px;
+    width: 200px;
+    height: 30px;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  #input-collection:focus { outline: none; border-color: #3b82f6; }
+
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  #sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #sidebar-header {
+    padding: 10px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+    border-bottom: 1px solid #f0f0f0;
+    flex-shrink: 0;
+  }
+
+  #doc-list {
+    flex: 1;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  #doc-list li {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #374151;
+    border-bottom: 1px solid #f9f9f9;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #doc-list li:hover   { background: #f3f4f6; }
+  #doc-list li.active  { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+
+  #doc-list .empty-msg {
+    color: #9ca3af;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: normal;
+    cursor: default;
+    padding: 16px 12px;
+  }
+
+  #doc-panel {
+    flex: 1;
+    padding: 20px 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  #doc-panel .placeholder {
+    margin: auto;
+    color: #9ca3af;
+    text-align: center;
+  }
+
+  #doc-meta {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+
+  #doc-meta table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  #doc-meta td {
+    padding: 3px 0;
+    vertical-align: top;
+  }
+
+  #doc-meta td:first-child {
+    color: #6b7280;
+    font-size: 12px;
+    width: 100px;
+    padding-right: 12px;
+  }
+
+  #doc-meta td:last-child {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    word-break: break-all;
+  }
+
+  #data-section label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+
+  #data-editor {
+    width: 100%;
+    min-height: 260px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    resize: vertical;
+    background: #fafafa;
+    color: #1a1a1a;
+  }
+
+  #data-editor:focus { outline: none; border-color: #3b82f6; background: #fff; }
+
+  #doc-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  #status-bar {
+    height: 32px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    flex-shrink: 0;
+    color: #6b7280;
+  }
+
+  #status-bar.ok    { color: #16a34a; }
+  #status-bar.error { color: #dc2626; }
+
+  /* ── Modal ── */
+  #created-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #created-overlay.open { display: flex; }
+
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #modal-overlay.open { display: flex; }
+
+  #modal {
+    background: #fff;
+    border-radius: 8px;
+    padding: 24px;
+    width: 480px;
+    max-width: 90vw;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  }
+
+  #modal h2 { font-size: 15px; font-weight: 600; }
+
+  .modal-field { display: flex; flex-direction: column; gap: 4px; }
+
+  .modal-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .modal-field input {
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 13px;
+    height: 32px;
+  }
+
+  .modal-field input:focus { outline: none; border-color: #3b82f6; }
+
+  .modal-field textarea {
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 160px;
+    background: #fafafa;
+  }
+
+  .modal-field textarea:focus { outline: none; border-color: #3b82f6; background: #fff; }
+
+  #modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>GistDB Admin</h1>
+  <label for="input-baseurl">URL</label>
+  <input id="input-baseurl" type="text" value="http://localhost:8080" placeholder="http://localhost:8080">
+  <label for="input-token">Token</label>
+  <input id="input-token" type="password" placeholder="Bearer token" autocomplete="off">
+  <button class="btn btn-secondary" onclick="saveConfig()">Save</button>
+  <button class="btn btn-secondary" style="margin-left:auto" onclick="window.location='/logout'">Logout</button>
+</header>
+
+<div id="toolbar">
+  <label for="input-collection">Collection</label>
+  <select id="input-collection" onchange="loadCollection()">
+    <option value="">— select —</option>
+  </select>
+  <button class="btn btn-primary" onclick="openNewDocModal()">+ New Document</button>
+  <button class="btn btn-secondary" style="margin-left:auto" onclick="clearCache()">Clear DB Cache</button>
+</div>
+
+<div id="created-overlay">
+  <div id="modal">
+    <h2>Document Created</h2>
+    <div class="modal-field">
+      <label>Document ID</label>
+      <input id="created-id" type="text" readonly style="font-family:monospace;background:#f3f4f6;cursor:default">
+    </div>
+    <div class="modal-field">
+      <label>Collection</label>
+      <input id="created-col" type="text" readonly style="background:#f3f4f6;cursor:default">
+    </div>
+    <div id="modal-actions">
+      <button class="btn btn-primary" onclick="closeCreatedModal()">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div id="modal">
+    <h2>New Document</h2>
+    <div class="modal-field">
+      <label for="modal-collection">Collection</label>
+      <input id="modal-collection" type="text" placeholder="e.g. users">
+    </div>
+    <div class="modal-field">
+      <label for="modal-data">Data (JSON)</label>
+      <textarea id="modal-data" spellcheck="false">{}</textarea>
+    </div>
+    <div id="modal-actions">
+      <button class="btn btn-secondary" onclick="closeNewDocModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="createDocument()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="main">
+  <aside id="sidebar">
+    <div id="sidebar-header">Documents</div>
+    <ul id="doc-list">
+      <li class="empty-msg">Load a collection to begin</li>
+    </ul>
+  </aside>
+
+  <div id="doc-panel">
+    <p class="placeholder">Select a document from the list</p>
+  </div>
+</div>
+
+<div id="status-bar">Ready</div>
+
+<script>
+  let currentCollection = '';
+  let currentDocId = '';
+
+  // Config
+
+  function loadConfig() {
+    const url   = localStorage.getItem('gistdb_url');
+    const token = localStorage.getItem('gistdb_token');
+    if (url)   document.getElementById('input-baseurl').value = url;
+    if (token) document.getElementById('input-token').value   = token;
+  }
+
+  function saveConfig() {
+    localStorage.setItem('gistdb_url',   document.getElementById('input-baseurl').value.trim());
+    localStorage.setItem('gistdb_token', document.getElementById('input-token').value.trim());
+    setStatus('Config saved', 'ok');
+  }
+
+  function getBaseURL() {
+    return document.getElementById('input-baseurl').value.trim().replace(/\/$/, '');
+  }
+
+  function getToken() {
+    return document.getElementById('input-token').value.trim();
+  }
+
+  // Status bar
+
+  function setStatus(msg, type = '') {
+    const bar = document.getElementById('status-bar');
+    bar.textContent = msg;
+    bar.className = type;
+  }
+
+  // Fetch helper
+
+  async function apiFetch(path, options = {}) {
+    const headers = {
+      'Authorization': `Bearer ${getToken()}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    };
+    const res = await fetch(getBaseURL() + path, { ...options, headers });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`${res.status} ${res.statusText}: ${text.trim()}`);
+    }
+    return res.json();
+  }
+
+  // Collection listing
+
+  async function fetchCollections() {
+    try {
+      const data = await apiFetch('/collections_list');
+      const select = document.getElementById('input-collection');
+      const current = select.value;
+      // keep placeholder, repopulate options
+      select.innerHTML = '<option value="">— select —</option>';
+      (data.collections || []).forEach(col => {
+        const opt = document.createElement('option');
+        opt.value = col;
+        opt.textContent = col;
+        if (col === current) opt.selected = true;
+        select.appendChild(opt);
+      });
+    } catch (e) {
+      console.log(e);
+      // non-fatal: dropdown stays empty
+    }
+  }
+
+  async function loadCollection() {
+    const col = document.getElementById('input-collection').value;
+    if (!col) return;
+
+    setStatus('Loading…');
+    try {
+      const data = await apiFetch(`/collections/${encodeURIComponent(col)}`);
+      currentCollection = col;
+      currentDocId = '';
+      renderDocList(data.ids || []);
+      clearDocPanel();
+      setStatus(`Loaded ${(data.ids || []).length} document(s) from "${col}"`, 'ok');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+  }
+
+  function renderDocList(ids) {
+    const list = document.getElementById('doc-list');
+    list.innerHTML = '';
+    if (!ids.length) {
+      const li = document.createElement('li');
+      li.className = 'empty-msg';
+      li.textContent = 'No documents in this collection';
+      list.appendChild(li);
+      return;
+    }
+    ids.forEach(id => {
+      const li = document.createElement('li');
+      li.textContent = id;
+      li.dataset.id = id;
+      li.onclick = () => loadDocument(id);
+      list.appendChild(li);
+    });
+  }
+
+  // Document view
+
+  async function loadDocument(id) {
+    setStatus('Loading…');
+    // highlight active
+    document.querySelectorAll('#doc-list li').forEach(li => li.classList.remove('active'));
+    const active = document.querySelector(`#doc-list li[data-id="${CSS.escape(id)}"]`);
+    if (active) active.classList.add('active');
+
+    try {
+      const res = await apiFetch(`/collections/${encodeURIComponent(currentCollection)}/${encodeURIComponent(id)}`);
+      currentDocId = id;
+      renderDocPanel(res);
+      setStatus(`Loaded ${id}`, 'ok');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+  }
+
+  function renderDocPanel(res) {
+    const content = res.content || {};
+    const panel = document.getElementById('doc-panel');
+
+    const rows = [
+      ['id',          content.id         || ''],
+      ['collection',  content.collection  || ''],
+      ['createdAt',   content.createdAt   || ''],
+    ];
+    if (content.modifiedAt) rows.push(['modifiedAt', content.modifiedAt]);
+
+    const metaRows = rows.map(([k, v]) =>
+      `<tr><td>${k}</td><td>${escHtml(v)}</td></tr>`
+    ).join('');
+
+    panel.innerHTML = `
+      <div id="doc-meta">
+        <table>${metaRows}</table>
+      </div>
+      <div id="data-section">
+        <label for="data-editor">data</label>
+        <textarea id="data-editor" spellcheck="false">${escHtml(JSON.stringify(content.data ?? {}, null, 2))}</textarea>
+      </div>
+      <div id="doc-actions">
+        <button class="btn btn-primary" onclick="saveDocument()">Save</button>
+        <button class="btn btn-danger"  onclick="deleteDocument()">Delete</button>
+      </div>
+    `;
+  }
+
+  function clearDocPanel() {
+    document.getElementById('doc-panel').innerHTML =
+      '<p class="placeholder">Select a document from the list</p>';
+  }
+
+  // Save (PATCH)
+
+  async function saveDocument() {
+    if (!currentDocId) return;
+    const raw = document.getElementById('data-editor').value;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      setStatus('Invalid JSON: ' + e.message, 'error');
+      return;
+    }
+
+    setStatus('Saving…');
+    try {
+      await apiFetch(
+        `/collections/${encodeURIComponent(currentCollection)}/${encodeURIComponent(currentDocId)}`,
+        { method: 'PATCH', body: JSON.stringify({ data: parsed }) }
+      );
+      setStatus(`Saved ${currentDocId}`, 'ok');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+  }
+
+  // Delete
+
+  async function deleteDocument() {
+    if (!currentDocId) return;
+    if (!confirm(`Delete "${currentDocId}" from "${currentCollection}"?`)) return;
+
+    setStatus('Deleting…');
+    try {
+      await apiFetch(
+        `/collections/${encodeURIComponent(currentCollection)}/${encodeURIComponent(currentDocId)}`,
+        { method: 'DELETE' }
+      );
+      // remove from list
+      const li = document.querySelector(`#doc-list li[data-id="${CSS.escape(currentDocId)}"]`);
+      if (li) li.remove();
+      if (!document.querySelectorAll('#doc-list li:not(.empty-msg)').length) {
+        const list = document.getElementById('doc-list');
+        list.innerHTML = '<li class="empty-msg">No documents in this collection</li>';
+      }
+      currentDocId = '';
+      clearDocPanel();
+      setStatus('Document deleted', 'ok');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+  }
+
+  // Utils
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // New document modal
+
+  function showCreatedModal(id, col) {
+    document.getElementById('created-id').value  = id;
+    document.getElementById('created-col').value = col;
+    document.getElementById('created-overlay').classList.add('open');
+  }
+
+  function closeCreatedModal() {
+    document.getElementById('created-overlay').classList.remove('open');
+  }
+
+  function openNewDocModal() {
+    document.getElementById('modal-collection').value = currentCollection || '';
+    document.getElementById('modal-data').value = '{}';
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('modal-collection').focus();
+  }
+
+  function closeNewDocModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById('modal-overlay')) closeNewDocModal();
+  }
+
+  async function createDocument() {
+    const col = document.getElementById('modal-collection').value.trim();
+    if (!col) {
+      document.getElementById('modal-collection').focus();
+      return;
+    }
+    const raw = document.getElementById('modal-data').value;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      setStatus('Invalid JSON: ' + e.message, 'error');
+      return;
+    }
+
+    setStatus('Creating…');
+    try {
+      const res = await apiFetch(`/collections/${encodeURIComponent(col)}`, {
+        method: 'POST',
+        body: JSON.stringify({ data: parsed }),
+      });
+      closeNewDocModal();
+      setStatus(`Created ${res.id} in "${col}"`, 'ok');
+      // if the active collection matches, append to the list
+      if (col === currentCollection) {
+        const list = document.getElementById('doc-list');
+        list.querySelector('.empty-msg')?.remove();
+        const li = document.createElement('li');
+        li.textContent = res.id;
+        li.dataset.id = res.id;
+        li.onclick = () => loadDocument(res.id);
+        list.appendChild(li);
+      }
+      showCreatedModal(res.id, col);
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+  }
+
+  // Clear cache
+
+  async function clearCache() {
+    setStatus('Clearing cache…');
+    try {
+      await apiFetch('/clear_cache', { method: 'POST' });
+      setStatus('Cache cleared', 'ok');
+      alert('Cache cleared successfully');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+  }
+
+  // Token auto-fetch
+
+  async function fetchToken() {
+    try {
+      const res = await fetch('/token');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.token) {
+        document.getElementById('input-token').value = data.token;
+        localStorage.setItem('gistdb_token', data.token);
+      }
+    } catch (e) {
+      // server unavailable or no key loaded — user can enter token manually
+    }
+  }
+
+  // Init
+  
+  loadConfig();
+  fetchToken().then(fetchCollections);
+</script>
+</body>
+</html>

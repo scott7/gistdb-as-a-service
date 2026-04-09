@@ -1,0 +1,49 @@
+# Admin Client for GistDB
+
+Simple web based admin client for the Document Database Service using HTML and Vanilla JS. This is run separately from the main service and is intended to be a small utility to aid in local testing and development. Not meant to be public/Internet facing.
+
+## Features
+
+- View collections — Select a collection from the dropdown to list all documents it contains.
+- View documents — Click any document in the list to view its full contents, including metadata (ID, collection, timestamps) and data payload.
+- Edit documents — Modify the document's JSON data inline and click Save to write the changes back.
+- Create documents — Use the New Document button to create a document in any collection. Specify the collection name and JSON data payload.
+- Delete documents — Remove a document permanently from the collection via the Delete button on the document view.
+- Clear DB cache — Flush the server-side in-memory and file cache via the Clear DB Cache button, forcing the next read to fetch fresh data from GitHub.
+
+## Token for GistDB Service
+
+When running the main.go application it will automatically create a bearer token that is valid for 6 hours. The web UI has a form that can be used to input a token manually if needed. 
+This requires the env var JWT_PRIVATE_KEY with the base64 encoded private key contents for the main service bearer token.
+
+## Authentication
+
+This comes with a login page and is HTTPS enabled (self-signed certificate). To add your user follow these steps:
+
+```
+cd client
+go run . --add-user myuser
+<follow prompt to set password>
+```
+
+User credentials are stored in credentials.json as bcrypt-hashed passwords with a cost factor of 12. Plaintext passwords are never written to disk.
+
+  Each entry in the file looks like:
+
+  [
+    {"username": "alice", "hash": "$2a$12$..."},
+    {"username": "bob",   "hash": "$2a$12$..."}
+  ]
+
+  The hash format is $2a$<cost>$<salt><hash> where the salt is randomly generated per user, meaning two users with the same password will produce different hashes.
+
+  ▎ credentials.json is excluded from version control via .gitignore.
+
+## Quickstart
+
+```
+export JWT_PRIVATE_KEY="$(base64 -i private.pem)"
+cd client
+go run main.go
+view in browser at https://localhost:8081
+```

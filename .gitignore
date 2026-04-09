@@ -27,6 +27,9 @@ go.work.sum
 # env file
 .env
 
+# client credentials (contains bcrypt hashes — do not commit)
+credentials.json
+
 # Editor/IDE
 # .idea/
 # .vscode/
