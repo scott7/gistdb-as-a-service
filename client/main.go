@@ -172,6 +172,20 @@ func generateSelfSignedCert() (tls.Certificate, error) {
 		return tls.Certificate{}, err
 	}
 
+	ips := []net.IP{net.ParseIP("127.0.0.1")}
+	if ifaces, err := net.Interfaces(); err == nil {
+		for _, iface := range ifaces {
+			addrs, _ := iface.Addrs()
+			for _, addr := range addrs {
+				if ipNet, ok := addr.(*net.IPNet); ok {
+					if ip4 := ipNet.IP.To4(); ip4 != nil && !ip4.IsLoopback() {
+						ips = append(ips, ip4)
+					}
+				}
+			}
+		}
+	}
+
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{Organization: []string{"GistDB Admin"}},
@@ -179,7 +193,7 @@ func generateSelfSignedCert() (tls.Certificate, error) {
 		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+		IPAddresses:  ips,
 		DNSNames:     []string{"localhost"},
 	}
 
