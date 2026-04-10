@@ -8,8 +8,9 @@ services:
     environment:
       - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY}
       - GISTDB_SERVICE_URL=${GISTDB_SERVICE_URL}
+      - CERT_IPS=${CERT_IPS}
     volumes:
-      - ./credentials.json:/data/credentials.json:ro
+      - ../credentials.json:/data/credentials.json:ro
     networks:
       - tunnel-net
 

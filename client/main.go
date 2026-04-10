@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -166,7 +167,7 @@ func sessionCookie(id string) *http.Cookie {
 
 // TLS
 
-func generateSelfSignedCert() (tls.Certificate, error) {
+func generateSelfSignedCert(extraIPs []net.IP) (tls.Certificate, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return tls.Certificate{}, err
@@ -185,6 +186,7 @@ func generateSelfSignedCert() (tls.Certificate, error) {
 			}
 		}
 	}
+	ips = append(ips, extraIPs...)
 
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
@@ -426,9 +428,9 @@ func main() {
 	mux.HandleFunc("/logout", logoutHandler)
 	mux.Handle("/token", requireSession(http.HandlerFunc(tokenHandler)))
 	blocked := map[string]bool{
-		"/main.go":    true,
-		"/README.md":  true,
-		"/readme.md":  true,
+		"/main.go":   true,
+		"/README.md": true,
+		"/readme.md": true,
 	}
 	indexTmpl := template.Must(template.ParseFiles("index.html"))
 	fileServer := http.FileServer(http.Dir("."))
@@ -445,7 +447,23 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})))
 
-	cert, err := generateSelfSignedCert()
+	var extraIPs []net.IP
+	for _, s := range strings.Split(os.Getenv("CERT_IPS"), ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if ip := net.ParseIP(s); ip != nil {
+			extraIPs = append(extraIPs, ip)
+		} else {
+			log.Printf("warning: CERT_IPS contains invalid IP %q, skipping", s)
+		}
+	}
+	if len(extraIPs) > 0 {
+		log.Printf("Adding %d extra IP(s) to TLS cert SAN from CERT_IPS", len(extraIPs))
+	}
+
+	cert, err := generateSelfSignedCert(extraIPs)
 	if err != nil {
 		log.Fatalf("generating TLS cert: %v", err)
 	}
