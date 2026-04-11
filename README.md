@@ -100,6 +100,7 @@ To run the application:
 
 ```
 export JWT_PRIVATE_KEY="$(base64 -i private.pem)"
+export GISTDB_SERVICE_URL="<url of main gistdb service>"
 cd client
 go run main.go
 view in browser at https://localhost:8081

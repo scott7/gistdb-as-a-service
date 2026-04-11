@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-demo-mode="{{.DemoMode}}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -401,7 +401,7 @@
 <div id="status-bar">Ready</div>
 
 <script>
-  const DEMO_MODE = {{if .DemoMode}}true{{else}}false{{end}};
+  const DEMO_MODE = document.documentElement.dataset.demoMode === 'true';
 
   let currentCollection = '';
   let currentDocId = '';

@@ -13,7 +13,7 @@ Simple web based admin client for the Document Database Service using HTML and V
 
 ## Token for GistDB Service
 
-When running the main.go application it will automatically create a bearer token that is valid for 6 hours. The web UI has a form that can be used to input a token manually if needed. 
+When running the main.go application it will act as a proxy for the frontend application and create a bearer token each time automatically. The expiration for this is two minutes.
 This requires the env var JWT_PRIVATE_KEY with the base64 encoded private key contents for the main service bearer token.
 
 ## Authentication
@@ -50,10 +50,15 @@ By default the client generates a self-signed certificate and serves over HTTPS.
 
 If neither is set, a self-signed certificate is generated at startup and the service is available at `https://localhost:8081`. Browsers will warn about the certificate; run `caddy trust` (or equivalent) once to add it to your system trust store.
 
+## Demo Mode
+
+Set env var `DEMO_MODE=1` to enable a read-only demo made 
+
 ## Quickstart
 
 ```
 export JWT_PRIVATE_KEY="$(base64 -i private.pem)"
+export GISTDB_SERVICE_URL="<url of main gistdb service>"
 cd client
 go run main.go
 view in browser at https://localhost:8081
