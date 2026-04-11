@@ -19,7 +19,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -167,7 +166,11 @@ func sessionCookie(id string) *http.Cookie {
 
 // TLS
 
-func generateSelfSignedCert(extraIPs []net.IP) (tls.Certificate, error) {
+func loadRealCert(certFile, keyFile string) (tls.Certificate, error) {
+	return tls.LoadX509KeyPair(certFile, keyFile)
+}
+
+func generateSelfSignedCert() (tls.Certificate, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return tls.Certificate{}, err
@@ -186,7 +189,6 @@ func generateSelfSignedCert(extraIPs []net.IP) (tls.Certificate, error) {
 			}
 		}
 	}
-	ips = append(ips, extraIPs...)
 
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
@@ -447,33 +449,35 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})))
 
-	var extraIPs []net.IP
-	for _, s := range strings.Split(os.Getenv("CERT_IPS"), ",") {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
+	var (
+		cert tls.Certificate
+		err  error
+	)
+	certFile, keyFile := os.Getenv("TLS_CERT_FILE"), os.Getenv("TLS_KEY_FILE")
+	if certFile != "" && keyFile != "" {
+		cert, err = loadRealCert(certFile, keyFile)
+		if err != nil {
+			log.Fatalf("loading TLS cert from %s / %s: %v", certFile, keyFile, err)
 		}
-		if ip := net.ParseIP(s); ip != nil {
-			extraIPs = append(extraIPs, ip)
-		} else {
-			log.Printf("warning: CERT_IPS contains invalid IP %q, skipping", s)
+		log.Printf("Loaded real TLS certificate from %s", certFile)
+	} else {
+		cert, err = generateSelfSignedCert()
+		if err != nil {
+			log.Fatalf("generating TLS cert: %v", err)
 		}
-	}
-	if len(extraIPs) > 0 {
-		log.Printf("Adding %d extra IP(s) to TLS cert SAN from CERT_IPS", len(extraIPs))
-	}
-
-	cert, err := generateSelfSignedCert(extraIPs)
-	if err != nil {
-		log.Fatalf("generating TLS cert: %v", err)
 	}
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
 
-	ln, err := tls.Listen("tcp", ":"+*port, tlsConfig)
+	var ln net.Listener
+	ln, err = tls.Listen("tcp", ":"+*port, tlsConfig)
 	if err != nil {
 		log.Fatalf("listening: %v", err)
 	}
 
-	log.Printf("Client serving on https://localhost:%s (self-signed cert)", *port)
+	if certFile != "" && keyFile != "" {
+		log.Printf("Client serving on https://localhost:%s (real cert)", *port)
+	} else {
+		log.Printf("Client serving on https://localhost:%s (self-signed cert)", *port)
+	}
 	log.Fatal(http.Serve(ln, mux))
 }

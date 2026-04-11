@@ -8,7 +8,10 @@ services:
     environment:
       - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY}
       - GISTDB_SERVICE_URL=${GISTDB_SERVICE_URL}
-      - CERT_IPS=${CERT_IPS}
+      # Optional: set both to use a real signed certificate instead of the self-signed one.
+      # Mount the cert/key files into the container and point these vars at the mounted paths.
+      - TLS_CERT_FILE=${TLS_CERT_FILE:-}
+      - TLS_KEY_FILE=${TLS_KEY_FILE:-}
     volumes:
       - ../credentials.json:/data/credentials.json:ro
     networks:
