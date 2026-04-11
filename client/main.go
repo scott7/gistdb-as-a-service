@@ -18,7 +18,10 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -358,29 +361,53 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-// Token handler
+// JWT and proxy
 
-var privateKey *rsa.PrivateKey
+var (
+	privateKey *rsa.PrivateKey
+	demoMode   bool
+)
 
-func tokenHandler(w http.ResponseWriter, r *http.Request) {
-	if privateKey == nil {
-		http.Error(w, "private key not loaded", http.StatusServiceUnavailable)
-		return
-	}
+func generateJWT() (string, error) {
 	claims := jwt.MapClaims{
 		"iss": "node-api",
 		"aud": "go-db-service",
-		"exp": time.Now().Add(6 * time.Hour).Unix(),
+		"exp": time.Now().Add(2 * time.Minute).Unix(),
 		"iat": time.Now().Unix(),
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	signed, err := token.SignedString(privateKey)
-	if err != nil {
-		http.Error(w, "failed to sign token", http.StatusInternalServerError)
-		return
+	return jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privateKey)
+}
+
+func makeAPIProxy(target *url.URL) http.Handler {
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(target)
+			pr.Out.URL.Path = strings.TrimPrefix(pr.In.URL.Path, "/api")
+			if pr.Out.URL.Path == "" {
+				pr.Out.URL.Path = "/"
+			}
+			pr.Out.URL.RawQuery = pr.In.URL.RawQuery
+			pr.Out.Host = target.Host
+			if signed, err := generateJWT(); err == nil {
+				pr.Out.Header.Set("Authorization", "Bearer "+signed)
+			}
+		},
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+			log.Printf("proxy error: %v", err)
+			http.Error(w, "upstream error", http.StatusBadGateway)
+		},
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"token": signed})
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if privateKey == nil {
+			http.Error(w, "private key not loaded", http.StatusServiceUnavailable)
+			return
+		}
+		if demoMode && r.Method != http.MethodGet {
+			http.Error(w, "read-only in demo mode", http.StatusMethodNotAllowed)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	})
 }
 
 func main() {
@@ -390,9 +417,18 @@ func main() {
 	newUser := flag.String("add-user", "", "add or update a user in the credentials file and exit")
 	flag.Parse()
 
-	serviceURL := os.Getenv("GISTDB_SERVICE_URL")
-	if serviceURL == "" {
-		serviceURL = "http://localhost:8085"
+	rawServiceURL := os.Getenv("GISTDB_SERVICE_URL")
+	if rawServiceURL == "" {
+		rawServiceURL = "http://localhost:8085"
+	}
+	serviceURL, urlErr := url.Parse(rawServiceURL)
+	if urlErr != nil {
+		log.Fatalf("invalid GISTDB_SERVICE_URL: %v", urlErr)
+	}
+
+	demoMode = os.Getenv("DEMO_MODE") != ""
+	if demoMode {
+		log.Println("Demo mode enabled: login skipped, writes blocked")
 	}
 
 	if *newUser != "" {
@@ -400,10 +436,12 @@ func main() {
 		return
 	}
 
-	if err := loadCredentials(*credsPath); err != nil {
-		log.Fatalf("credentials: %v\nRun with --add-user <username> to create credentials.", err)
+	if !demoMode {
+		if err := loadCredentials(*credsPath); err != nil {
+			log.Fatalf("credentials: %v\nRun with --add-user <username> to create credentials.", err)
+		}
+		log.Printf("Loaded %d user(s) from %s", len(credentials), *credsPath)
 	}
-	log.Printf("Loaded %d user(s) from %s", len(credentials), *credsPath)
 
 	var keyData []byte
 	if pemEnv := os.Getenv("JWT_PRIVATE_KEY"); pemEnv != "" {
@@ -425,10 +463,23 @@ func main() {
 		}
 	}
 
+	apiProxy := makeAPIProxy(serviceURL)
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/login", loginHandler)
+	if demoMode {
+		mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/", http.StatusFound)
+		})
+	} else {
+		mux.HandleFunc("/login", loginHandler)
+	}
 	mux.HandleFunc("/logout", logoutHandler)
-	mux.Handle("/token", requireSession(http.HandlerFunc(tokenHandler)))
+	if demoMode {
+		mux.Handle("/api/", apiProxy)
+	} else {
+		mux.Handle("/api/", requireSession(apiProxy))
+	}
+
 	blocked := map[string]bool{
 		"/main.go":   true,
 		"/README.md": true,
@@ -436,18 +487,23 @@ func main() {
 	}
 	indexTmpl := template.Must(template.ParseFiles("index.html"))
 	fileServer := http.FileServer(http.Dir("."))
-	mux.Handle("/", requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	indexH := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if blocked[r.URL.Path] {
 			http.NotFound(w, r)
 			return
 		}
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			indexTmpl.Execute(w, map[string]string{"ServiceURL": serviceURL})
+			indexTmpl.Execute(w, map[string]any{"DemoMode": demoMode})
 			return
 		}
 		fileServer.ServeHTTP(w, r)
-	})))
+	})
+	if demoMode {
+		mux.Handle("/", indexH)
+	} else {
+		mux.Handle("/", requireSession(indexH))
+	}
 
 	var (
 		ln  net.Listener

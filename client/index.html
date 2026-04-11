@@ -37,26 +37,23 @@
     margin-right: 8px;
   }
 
-  header label {
-    font-size: 12px;
-    color: #aaa;
+  .demo-badge {
+    margin-left: auto;
+    background: #854d0e;
+    color: #fef08a;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
     white-space: nowrap;
   }
 
-  header input {
-    background: #2e2e2e;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #fff;
-    padding: 4px 8px;
-    font-size: 13px;
-    height: 30px;
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
-
-  #input-baseurl { width: 200px; }
-  #input-token   { width: 260px; }
-
-  header input:focus { outline: none; border-color: #888; }
 
   .btn {
     border: none;
@@ -328,8 +325,6 @@
   @media (max-width: 640px) {
     header { height: auto; flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
     header h1 { width: 100%; margin-right: 0; }
-    #input-baseurl, #input-token { width: 0; flex: 1 1 120px; }
-    header label { display: none; }
     #toolbar { flex-wrap: wrap; }
     #input-collection { flex: 1; width: auto; }
     #main { flex-direction: column; }
@@ -342,12 +337,7 @@
 
 <header>
   <h1>GistDB Admin</h1>
-  <label for="input-baseurl">URL</label>
-  <input id="input-baseurl" type="text" value="{{.ServiceURL}}" placeholder="http://localhost:8085">
-  <label for="input-token">Token</label>
-  <input id="input-token" type="password" placeholder="Bearer token" autocomplete="off">
-  <button class="btn btn-secondary" onclick="saveConfig()">Save</button>
-  <button class="btn btn-secondary" style="margin-left:auto" onclick="window.location='/logout'">Logout</button>
+  {{if .DemoMode}}<span class="demo-badge">Demo Mode — read only</span>{{else}}<button class="btn btn-secondary" style="margin-left:auto" onclick="window.location='/logout'">Logout</button>{{end}}
 </header>
 
 <div id="toolbar">
@@ -355,8 +345,8 @@
   <select id="input-collection" onchange="loadCollection()">
     <option value="">— select —</option>
   </select>
-  <button class="btn btn-primary" onclick="openNewDocModal()">+ New Document</button>
-  <button class="btn btn-secondary" style="margin-left:auto" onclick="clearCache()">Clear DB Cache</button>
+  {{if not .DemoMode}}<button class="btn btn-primary" onclick="openNewDocModal()">+ New Document</button>{{end}}
+  <button class="btn btn-secondary" style="margin-left:auto" onclick="clearCache()" {{if .DemoMode}}disabled{{end}}>Clear DB Cache</button>
 </div>
 
 <div id="created-overlay">
@@ -411,31 +401,10 @@
 <div id="status-bar">Ready</div>
 
 <script>
+  const DEMO_MODE = {{if .DemoMode}}true{{else}}false{{end}};
+
   let currentCollection = '';
   let currentDocId = '';
-
-  // Config
-
-  function loadConfig() {
-    const url   = localStorage.getItem('gistdb_url');
-    const token = localStorage.getItem('gistdb_token');
-    if (url)   document.getElementById('input-baseurl').value = url;
-    if (token) document.getElementById('input-token').value   = token;
-  }
-
-  function saveConfig() {
-    localStorage.setItem('gistdb_url',   document.getElementById('input-baseurl').value.trim());
-    localStorage.setItem('gistdb_token', document.getElementById('input-token').value.trim());
-    setStatus('Config saved', 'ok');
-  }
-
-  function getBaseURL() {
-    return document.getElementById('input-baseurl').value.trim().replace(/\/$/, '');
-  }
-
-  function getToken() {
-    return document.getElementById('input-token').value.trim();
-  }
 
   // Status bar
 
@@ -445,15 +414,14 @@
     bar.className = type;
   }
 
-  // Fetch helper
+  // Fetch helper — calls the server-side proxy; JWT is attached by the Go server
 
   async function apiFetch(path, options = {}) {
     const headers = {
-      'Authorization': `Bearer ${getToken()}`,
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     };
-    const res = await fetch(getBaseURL() + path, { ...options, headers });
+    const res = await fetch('/api' + path, { ...options, headers });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`${res.status} ${res.statusText}: ${text.trim()}`);
@@ -559,13 +527,15 @@
       </div>
       <div id="data-section">
         <label for="data-editor">data</label>
-        <textarea id="data-editor" spellcheck="false">${escHtml(JSON.stringify(content.data ?? {}, null, 2))}</textarea>
-        <button class="btn btn-secondary" style="margin-top:6px;font-size:12px" onclick="applyStringify('data-editor', this)">Convert to JSON string</button>
+        <textarea id="data-editor" spellcheck="false"${DEMO_MODE ? ' readonly' : ''}>${escHtml(JSON.stringify(content.data ?? {}, null, 2))}</textarea>
+        ${DEMO_MODE ? '' : '<button class="btn btn-secondary" style="margin-top:6px;font-size:12px" onclick="applyStringify(\'data-editor\', this)">Convert to JSON string</button>'}
       </div>
+      ${DEMO_MODE ? '' : `
       <div id="doc-actions">
         <button class="btn btn-primary" onclick="saveDocument()">Save</button>
         <button class="btn btn-danger"  onclick="deleteDocument()">Delete</button>
       </div>
+      `}
     `;
   }
 
@@ -724,26 +694,9 @@
     }
   }
 
-  // Token auto-fetch
-
-  async function fetchToken() {
-    try {
-      const res = await fetch('/token');
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.token) {
-        document.getElementById('input-token').value = data.token;
-        localStorage.setItem('gistdb_token', data.token);
-      }
-    } catch (e) {
-      // server unavailable or no key loaded — user can enter token manually
-    }
-  }
-
   // Init
-  
-  loadConfig();
-  fetchToken().then(fetchCollections);
+
+  fetchCollections();
 </script>
 </body>
 </html>
