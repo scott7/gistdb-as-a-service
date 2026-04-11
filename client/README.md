@@ -2,6 +2,10 @@
 
 Simple web based admin client for the Document Database Service using HTML and Vanilla JS. This is run separately from the main service and is intended to be a small utility to aid in local testing and development. Not meant to be public/Internet facing.
 
+## Demo
+
+https://demodb.scottw.info/
+
 ## Features
 
 - View collections — Select a collection from the dropdown to list all documents it contains.

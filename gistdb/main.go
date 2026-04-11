@@ -66,8 +66,8 @@ func main() {
 		log.Fatalf("JWT init failed: %v", err)
 	}
 
-	// cache items expire in 1 hour, if set to 0 never expire
-	cache := dbcache.NewCache("/tmp/gocache.json", 3600)
+	// cache items expire in 10 minutes, if set to 0 never expire
+	cache := dbcache.NewCache("/tmp/gocache.json", 600)
 	filename_cache := dbcache.NewCache("/tmp/fnamecache.json", 0)
 	index_cache := dbcache.NewCache("/tmp/index.json", 0)
 	token := os.Getenv("GITHUB_TOKEN")

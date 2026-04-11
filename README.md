@@ -8,6 +8,11 @@ https://github.com/scott7/gistdb-as-a-service
 ![Go](https://img.shields.io/badge/Go-%2300ADD8.svg?&logo=go&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=fff)
 
+## Demo
+
+https://demodb.scottw.info/
+
+
 ## Notice
 
 This is a personal and educational project only. This is not intended to be a fully functioning or secure DB service.
@@ -28,7 +33,7 @@ There are multiple caches for this service:
 
 All data is cached via write-through method with everything persisting in GitHub.
 
-1. Database Cache: This is an in memory cache to store the contents of all documents in the database. This is also using a write-through file based cache that the service will fall back to if the contents are not found in the in-memory cache. If the in memory cache exceeds a certain size it is cleared. The file-based cache will persist until the /tmp files are cleared (i.e. app is redeployed) (`default cache ttl 1 hour`)
+1. Database Cache: This is an in memory cache to store the contents of all documents in the database. This is also using a write-through file based cache that the service will fall back to if the contents are not found in the in-memory cache. If the in memory cache exceeds a certain size it is cleared. The file-based cache will persist until the /tmp files are cleared (i.e. app is redeployed) (`default cache ttl 10 minutes`)
 2. Filename Cache: This is an in memory and file based cache to map unique document ID to github gist ID. (`no cache expiration here`)
 3. Index Cache: Maps collection names to arrays of document IDs for efficient collection queries. (`no cache expiration here`)
 
