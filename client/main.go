@@ -450,34 +450,35 @@ func main() {
 	})))
 
 	var (
-		cert tls.Certificate
-		err  error
+		ln  net.Listener
+		err error
 	)
-	certFile, keyFile := os.Getenv("TLS_CERT_FILE"), os.Getenv("TLS_KEY_FILE")
-	if certFile != "" && keyFile != "" {
-		cert, err = loadRealCert(certFile, keyFile)
+	if os.Getenv("NO_TLS") != "" {
+		ln, err = net.Listen("tcp", ":"+*port)
 		if err != nil {
-			log.Fatalf("loading TLS cert from %s / %s: %v", certFile, keyFile, err)
+			log.Fatalf("listening: %v", err)
 		}
-		log.Printf("Loaded real TLS certificate from %s", certFile)
+		log.Printf("Client serving on http://localhost:%s (no TLS)", *port)
 	} else {
-		cert, err = generateSelfSignedCert()
+		var cert tls.Certificate
+		certFile, keyFile := os.Getenv("TLS_CERT_FILE"), os.Getenv("TLS_KEY_FILE")
+		if certFile != "" && keyFile != "" {
+			cert, err = loadRealCert(certFile, keyFile)
+			if err != nil {
+				log.Fatalf("loading TLS cert from %s / %s: %v", certFile, keyFile, err)
+			}
+			log.Printf("Client serving on https://localhost:%s (real cert)", *port)
+		} else {
+			cert, err = generateSelfSignedCert()
+			if err != nil {
+				log.Fatalf("generating TLS cert: %v", err)
+			}
+			log.Printf("Client serving on https://localhost:%s (self-signed cert)", *port)
+		}
+		ln, err = tls.Listen("tcp", ":"+*port, &tls.Config{Certificates: []tls.Certificate{cert}})
 		if err != nil {
-			log.Fatalf("generating TLS cert: %v", err)
+			log.Fatalf("listening: %v", err)
 		}
-	}
-	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
-
-	var ln net.Listener
-	ln, err = tls.Listen("tcp", ":"+*port, tlsConfig)
-	if err != nil {
-		log.Fatalf("listening: %v", err)
-	}
-
-	if certFile != "" && keyFile != "" {
-		log.Printf("Client serving on https://localhost:%s (real cert)", *port)
-	} else {
-		log.Printf("Client serving on https://localhost:%s (self-signed cert)", *port)
 	}
 	log.Fatal(http.Serve(ln, mux))
 }

@@ -39,6 +39,17 @@ User credentials are stored in credentials.json as bcrypt-hashed passwords with 
 
   ▎ credentials.json is excluded from version control via .gitignore.
 
+## TLS / HTTPS
+
+By default the client generates a self-signed certificate and serves over HTTPS. Two environment variables change this behaviour:
+
+| Variable | Effect |
+|---|---|
+| `NO_TLS=1` | Serve plain HTTP — no certificate generated or required. Intended for deployments where TLS is terminated upstream (e.g. a reverse proxy). |
+| `TLS_CERT_FILE` + `TLS_KEY_FILE` | Load a real signed certificate from the given paths instead of generating a self-signed one. Both must be set together. |
+
+If neither is set, a self-signed certificate is generated at startup and the service is available at `https://localhost:8081`. Browsers will warn about the certificate; run `caddy trust` (or equivalent) once to add it to your system trust store.
+
 ## Quickstart
 
 ```
