@@ -207,7 +207,6 @@ func (c *GitHubClient) UpdateGist(gistID string, filename string, content map[st
 	}
 	bodyReader := bytes.NewReader(jsonPayload)
 	if err := c.doGitHubRequest("PATCH", url, bodyReader, &out); err != nil {
-		fmt.Printf("error here\n")
 		return nil, err
 	}
 

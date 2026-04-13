@@ -2,7 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -166,11 +166,11 @@ func (h *Handler) GetDocumentHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		doc.Content = cache_doc_converted
 		doc.Name = id
-		fmt.Println("getting from cache doc: ", gist_id_str)
+		log.Println("getting from cache doc: ", gist_id_str)
 	} else {
 		// cache miss - reach out to github and get document
 		doc, err = h.Client.GetGistTyped(gist_id_str)
-		fmt.Println("getting from github: ", gist_id_str)
+		log.Println("getting from github: ", gist_id_str)
 		if err != nil {
 			http.Error(w, "document not found", http.StatusNotFound)
 			return

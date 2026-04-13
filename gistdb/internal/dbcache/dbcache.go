@@ -108,7 +108,7 @@ func (c *Cache) Set(key string, value any) error {
 	var fileCacheMap map[string]CacheItem
 	err = json.Unmarshal([]byte(fileCacheContent), &fileCacheMap)
 	if err != nil {
-		fmt.Println("Error unmarshaling to map:", err)
+		log.Println("Error unmarshaling to map:", err)
 	}
 
 	fileCacheMap[key] = CacheItem{
@@ -201,7 +201,7 @@ func (c *Cache) Get(key string) (any, bool) {
 	// check file cache if not found in memory
 	item, ok := c.data[key]
 	if !ok {
-		fmt.Println("not found in memory - checking file cache")
+		log.Println("not found in memory - checking file cache")
 		fileCacheContent, err := os.ReadFile(c.filepath)
 		if err != nil {
 			return nil, false
@@ -209,19 +209,19 @@ func (c *Cache) Get(key string) (any, bool) {
 		var fileCacheMap map[string]CacheItem
 		err = json.Unmarshal([]byte(fileCacheContent), &fileCacheMap)
 		if err != nil {
-			fmt.Println("Error unmarshaling to map:", err)
+			log.Println("Error unmarshaling to map:", err)
 			return nil, false
 		}
 		cacheItem, fileOk := fileCacheMap[key]
 		if !fileOk {
-			fmt.Printf("not found in file cache\n")
+			log.Printf("not found in file cache\n")
 			return nil, false
 		}
-		fmt.Printf("found in file cache: %v\n", cacheItem)
+		log.Printf("found in file cache: %v\n", cacheItem)
 
 		// Check if item from file cache is expired
 		if !cacheItem.Expiry.IsZero() && cacheItem.Expiry.Before(time.Now()) {
-			fmt.Printf("item from file cache is expired\n")
+			log.Printf("item from file cache is expired\n")
 			c.deleteUnlocked(key)
 			return nil, false
 		}
@@ -308,7 +308,7 @@ func (c *Cache) AppendToList(key, value string) error {
 	}
 	var fileCacheMap map[string]CacheItem
 	if err := json.Unmarshal(fileCacheContent, &fileCacheMap); err != nil {
-		fmt.Println("Error unmarshaling to map:", err)
+		log.Println("Error unmarshaling to map:", err)
 	}
 	fileCacheMap[key] = CacheItem{Value: updated, Expiry: expirationTime}
 	return writeFileCache(fileCacheMap, c)
@@ -345,7 +345,7 @@ func (c *Cache) RemoveFromList(key, value string) error {
 	}
 	var fileCacheMap map[string]CacheItem
 	if err := json.Unmarshal(fileCacheContent, &fileCacheMap); err != nil {
-		fmt.Println("Error unmarshaling to map:", err)
+		log.Println("Error unmarshaling to map:", err)
 	}
 	fileCacheMap[key] = CacheItem{Value: filtered, Expiry: expirationTime}
 	return writeFileCache(fileCacheMap, c)
@@ -353,11 +353,11 @@ func (c *Cache) RemoveFromList(key, value string) error {
 
 func (c *Cache) deleteUnlocked(key string) error {
 	// helper functino to delete cache - assumes mutex is unlocked.
-	fmt.Printf("removing item from cache\n")
+	log.Printf("removing item from cache\n")
 	delete(c.data, key)
 
 	if !fileThere(c.filepath) {
-		fmt.Printf("File '%s' does not exist.\n", c.filepath)
+		log.Printf("File '%s' does not exist.\n", c.filepath)
 		return nil
 	}
 
@@ -399,14 +399,14 @@ func (c *Cache) Keys() []string {
 }
 
 func (c *Cache) Clear() {
-	fmt.Printf("Clearing memory cache\n")
+	log.Printf("Clearing memory cache\n")
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.data = make(map[string]CacheItem)
 }
 
 func (c *Cache) ClearFile() {
-	fmt.Printf("Clearing file cache\n")
+	log.Printf("Clearing file cache\n")
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	os.Remove(c.filepath)

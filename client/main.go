@@ -56,9 +56,9 @@ func saveCredentials(path string, creds []credential) error {
 }
 
 func addUser(credsPath, username string) {
-	fmt.Printf("Password for %s: ", username)
+	log.Printf("Password for %s: ", username)
 	raw, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Println()
+	log.Println()
 	if err != nil {
 		log.Fatalf("reading password: %v", err)
 	}
@@ -83,7 +83,7 @@ func addUser(credsPath, username string) {
 			if err := saveCredentials(credsPath, existing); err != nil {
 				log.Fatalf("saving credentials: %v", err)
 			}
-			fmt.Printf("Updated password for %s in %s\n", username, credsPath)
+			log.Printf("Updated password for %s in %s\n", username, credsPath)
 			return
 		}
 	}
@@ -92,7 +92,7 @@ func addUser(credsPath, username string) {
 	if err := saveCredentials(credsPath, existing); err != nil {
 		log.Fatalf("saving credentials: %v", err)
 	}
-	fmt.Printf("Added user %s to %s\n", username, credsPath)
+	log.Printf("Added user %s to %s\n", username, credsPath)
 }
 
 func validateCredentials(username, password string) bool {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -34,10 +33,10 @@ func populateCaches(client api.GithubClient, cache, filename_cache, index_cache 
 	}
 
 	gists_map := githubclient.ExtractGistNames(gists)
-	fmt.Println(gists_map)
+	log.Println(gists_map)
 	filename_cache.Assign(gists_map)
 	for _, gistName := range gists_map {
-		fmt.Printf("gist name: %#v\n", gistName)
+		log.Printf("gist name: %#v\n", gistName)
 	}
 
 	indexMap := make(map[any][]string)
