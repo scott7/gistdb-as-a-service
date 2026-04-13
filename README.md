@@ -113,9 +113,9 @@ view in browser at https://localhost:8081
 
 See [client/README.md](client/README.md) for more details.
 
-![GistDB Admin UI](docs/db_admin_edit.png)
+![GistDB Admin UI](/db_admin_edit.png)
 
-![GistDB Admin login](docs/db_login.png)
+![GistDB Admin login](/db_login.png)
 
 ## Quickstart with Docker
 

@@ -109,8 +109,7 @@ func (h *Handler) CreateDocumentHandler(w http.ResponseWriter, r *http.Request) 
 	h.DBCache.Set(custom_id_str, content)
 
 	// update index cache so the new document appears
-	existingIDs, _ := h.IndexCache.GetStrings(collection)
-	h.IndexCache.Set(collection, append(existingIDs, custom_id_str))
+	h.IndexCache.AppendToList(collection, custom_id_str)
 
 	json.NewEncoder(w).Encode(map[string]any{
 		"id": custom_id,
@@ -301,15 +300,7 @@ func (h *Handler) DeleteDocumentHandler(w http.ResponseWriter, r *http.Request) 
 	h.FNameCache.Delete(id)
 
 	// remove id from index cache
-	if existing, ok := h.IndexCache.GetStrings(collection); ok {
-		filtered := make([]string, 0, len(existing))
-		for _, s := range existing {
-			if s != id {
-				filtered = append(filtered, s)
-			}
-		}
-		h.IndexCache.Set(collection, filtered)
-	}
+	h.IndexCache.RemoveFromList(collection, id)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{

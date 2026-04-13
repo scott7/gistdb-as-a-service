@@ -261,6 +261,96 @@ func (c *Cache) GetStrings(key string) ([]string, bool) {
 	return nil, false
 }
 
+func (c *Cache) getStringsUnlocked(key string) []string {
+	// getStringsUnlocked reads a list value from the in-memory cache.
+	// Must be called with mutex already held.
+	item, ok := c.data[key]
+	if !ok {
+		return nil
+	}
+	if !item.Expiry.IsZero() && item.Expiry.Before(time.Now()) {
+		c.deleteUnlocked(key)
+		return nil
+	}
+	switch v := item.Value.(type) {
+	case []string:
+		return v
+	case []interface{}:
+		out := make([]string, 0, len(v))
+		for _, elem := range v {
+			if s, ok := elem.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
+func (c *Cache) AppendToList(key, value string) error {
+	// AppendToList atomically appends value to the string list stored at key.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	updated := append(c.getStringsUnlocked(key), value)
+
+	var expirationTime time.Time
+	if c.ttl != 0 {
+		expirationTime = time.Now().Add(time.Duration(c.ttl) * time.Second)
+	}
+
+	c.data[key] = CacheItem{Value: updated, Expiry: expirationTime}
+
+	checkWriteFile(c.filepath)
+	fileCacheContent, err := os.ReadFile(c.filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var fileCacheMap map[string]CacheItem
+	if err := json.Unmarshal(fileCacheContent, &fileCacheMap); err != nil {
+		fmt.Println("Error unmarshaling to map:", err)
+	}
+	fileCacheMap[key] = CacheItem{Value: updated, Expiry: expirationTime}
+	return writeFileCache(fileCacheMap, c)
+}
+
+func (c *Cache) RemoveFromList(key, value string) error {
+	// RemoveFromList atomically removes all occurrences of value from the string list stored at key.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	existing := c.getStringsUnlocked(key)
+	if existing == nil {
+		return nil
+	}
+
+	filtered := make([]string, 0, len(existing))
+	for _, s := range existing {
+		if s != value {
+			filtered = append(filtered, s)
+		}
+	}
+
+	var expirationTime time.Time
+	if c.ttl != 0 {
+		expirationTime = time.Now().Add(time.Duration(c.ttl) * time.Second)
+	}
+
+	c.data[key] = CacheItem{Value: filtered, Expiry: expirationTime}
+
+	checkWriteFile(c.filepath)
+	fileCacheContent, err := os.ReadFile(c.filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var fileCacheMap map[string]CacheItem
+	if err := json.Unmarshal(fileCacheContent, &fileCacheMap); err != nil {
+		fmt.Println("Error unmarshaling to map:", err)
+	}
+	fileCacheMap[key] = CacheItem{Value: filtered, Expiry: expirationTime}
+	return writeFileCache(fileCacheMap, c)
+}
+
 func (c *Cache) deleteUnlocked(key string) error {
 	// helper functino to delete cache - assumes mutex is unlocked.
 	fmt.Printf("removing item from cache\n")
