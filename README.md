@@ -113,9 +113,9 @@ view in browser at https://localhost:8081
 
 See [client/README.md](client/README.md) for more details.
 
-![GistDB Admin UI](/db_admin_edit.png)
+![GistDB Admin UI](docs/db_admin_edit.png)
 
-![GistDB Admin login](/db_login.png)
+![GistDB Admin login](docs/db_login.png)
 
 ## Quickstart with Docker
 
@@ -163,6 +163,8 @@ curl -X GET http://localhost:8085/collections/users/DOCUMENT_ID \
 | `GET` | `/collections/{collection}/{id}` | Retrieve a document |
 | `PATCH` | `/collections/{collection}/{id}` | Update a document |
 | `DELETE` | `/collections/{collection}/{id}` | Delete a document |
+| `GET` | `/collections_list` | List all collections |
+| `POST` | `/clear_cache` | Clear the in-memory and file-based database cache |
 
 ## Environment Variables
 
