@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"gistdb-as-a-service/gistdb/internal/api"
@@ -12,6 +13,16 @@ import (
 	"gistdb-as-a-service/gistdb/internal/dbcache"
 	"gistdb-as-a-service/gistdb/internal/githubclient"
 )
+
+// refreshLockMiddleware acquires a read lock for the duration of each request,
+// preventing populateCaches from running while any API request is in flight.
+func refreshLockMiddleware(mu *sync.RWMutex, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.RLock()
+		defer mu.RUnlock()
+		next.ServeHTTP(w, r)
+	})
+}
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -80,12 +91,20 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// refreshMu: read-locked by every API request, write-locked by populateCaches.
+	// This ensures the cache refresh never runs while a request is in flight.
+	var refreshMu sync.RWMutex
+
 	// background refresh cache every 15 minutes (instead of relying on restart)
+	// take a lock so user API commands do not cause race condition here.
 	go func() {
 		ticker := time.NewTicker(15 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
-			if err := populateCaches(client, cache, filename_cache, index_cache); err != nil {
+			refreshMu.Lock()
+			err := populateCaches(client, cache, filename_cache, index_cache)
+			refreshMu.Unlock()
+			if err != nil {
 				log.Printf("cache refresh failed: %v", err)
 			}
 		}
@@ -130,6 +149,6 @@ func main() {
 	})
 
 	log.Println("Server running on :8085")
-	log.Fatal(http.ListenAndServe(":8085", corsMiddleware(auth.Middleware(mux))))
+	log.Fatal(http.ListenAndServe(":8085", corsMiddleware(auth.Middleware(refreshLockMiddleware(&refreshMu, mux)))))
 
 }
