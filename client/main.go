@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -14,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"math/big"
 	"net"
@@ -233,6 +235,33 @@ func requireSession(next http.Handler) http.Handler {
 	})
 }
 
+// Template rendering
+
+// renderTemplate buffers the render so a template failure is loud: escaping
+// errors surface only at execute time, and writing straight to the
+// ResponseWriter turns them into a blank 200 with a half-written body.
+func renderTemplate(w http.ResponseWriter, name string, t *template.Template, status int, data any) {
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		log.Printf("ERROR: rendering %s template: %v", name, err)
+		http.Error(w, "internal error: page template failed to render", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	if _, err := buf.WriteTo(w); err != nil {
+		log.Printf("ERROR: writing %s response: %v", name, err)
+	}
+}
+
+// checkTemplate renders once at startup with representative data so an
+// escaping error fails the process immediately instead of on first request.
+func checkTemplate(name string, t *template.Template, data any) {
+	if err := t.Execute(io.Discard, data); err != nil {
+		log.Fatalf("ERROR: %s template is invalid: %v", name, err)
+	}
+}
+
 // Login page
 // Injecting login page here to prevent the admin page (indenx.html) from being exposed prior to auth.
 
@@ -243,77 +272,69 @@ const loginPageTmpl = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GistDB Admin — Sign in</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a1a'/><path d='M7 11v10c0 2.2 4 4 9 4s9-1.8 9-4V11' fill='%232563eb'/><ellipse cx='16' cy='11' rx='9' ry='3.5' fill='%233b82f6'/><ellipse cx='16' cy='17' rx='9' ry='3.5' fill='none' stroke='%2393c5fd' stroke-width='1.2'/><ellipse cx='16' cy='21' rx='9' ry='3.5' fill='%231d4ed8'/></svg>">
+<script>
+  // Same preference the admin page writes, applied before first paint so the
+  // two screens agree. No stored value means auto (prefers-color-scheme).
+  (function () {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Pico supplies the card, form controls and palette; this is just centring. */
+  :root {
+    --pico-font-size: 87.5%;
+    --pico-border-radius: 0.25rem;
+  }
+
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #f5f5f5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
+    display: grid;
+    place-items: center;
+    min-height: 100dvh;
+    margin: 0;
+    padding: 1rem;
   }
-  .card {
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.1);
-    padding: 36px 40px;
-    width: 360px;
+
+  main { width: 22rem; max-width: 100%; }
+
+  article { margin: 0; padding: 1.5rem 1.75rem; }
+
+  h1 { font-size: 1.15rem; margin-bottom: 0.15rem; }
+
+  .subtitle {
+    color: var(--pico-muted-color);
+    font-size: 0.85rem;
+    margin-bottom: 1.5rem;
   }
-  h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
-  .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 28px; }
-  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
-  label { font-size: 12px; font-weight: 600; color: #374151; }
-  input {
-    border: 1px solid #d1d5db;
-    border-radius: 5px;
-    padding: 8px 10px;
-    font-size: 14px;
-    height: 36px;
-  }
-  input:focus { outline: none; border-color: #3b82f6; }
-  button {
-    width: 100%;
-    background: #1a1a1a;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    padding: 9px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    margin-top: 8px;
-    height: 38px;
-  }
-  button:hover { background: #333; }
+
   .error {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 5px;
-    color: #dc2626;
-    font-size: 13px;
-    padding: 9px 12px;
-    margin-bottom: 16px;
+    border: 1px solid var(--pico-del-color);
+    border-radius: var(--pico-border-radius);
+    color: var(--pico-del-color);
+    font-size: 0.85rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 1.25rem;
   }
 </style>
 </head>
 <body>
-<div class="card">
-  <h1>GistDB Admin</h1>
-  <p class="subtitle">Sign in to continue</p>
-  {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
-  <form method="POST" action="/login" autocomplete="off">
-    <div class="field">
+<main>
+  <article>
+    <h1>GistDB Admin</h1>
+    <p class="subtitle">Sign in to continue</p>
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <form method="POST" action="/login" autocomplete="off">
       <label for="username">Username</label>
-      <input id="username" name="username" type="text" autofocus autocomplete="off">
-    </div>
-    <div class="field">
+      <input id="username" name="username" type="text" autofocus autocomplete="off"{{if .Error}} aria-invalid="true"{{end}}>
+
       <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="off">
-    </div>
-    <button type="submit">Sign in</button>
-  </form>
-</div>
+      <input id="password" name="password" type="password" autocomplete="off"{{if .Error}} aria-invalid="true"{{end}}>
+
+      <button type="submit">Sign in</button>
+    </form>
+  </article>
+</main>
 </body>
 </html>`
 
@@ -322,7 +343,7 @@ var loginTmpl = template.Must(template.New("login").Parse(loginPageTmpl))
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		loginTmpl.Execute(w, map[string]string{"Error": ""})
+		renderTemplate(w, "login", loginTmpl, http.StatusOK, map[string]string{"Error": ""})
 
 	case http.MethodPost:
 		r.ParseForm()
@@ -330,8 +351,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		password := r.FormValue("password")
 
 		if !validateCredentials(username, password) {
-			w.WriteHeader(http.StatusUnauthorized)
-			loginTmpl.Execute(w, map[string]string{"Error": "Invalid username or password"})
+			renderTemplate(w, "login", loginTmpl, http.StatusUnauthorized, map[string]string{"Error": "Invalid username or password"})
 			return
 		}
 
@@ -486,6 +506,8 @@ func main() {
 		"/readme.md": true,
 	}
 	indexTmpl := template.Must(template.ParseFiles("index.html"))
+	checkTemplate("index", indexTmpl, map[string]any{"DemoMode": demoMode})
+	checkTemplate("login", loginTmpl, map[string]string{"Error": "check"})
 	fileServer := http.FileServer(http.Dir("."))
 	indexH := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if blocked[r.URL.Path] {
@@ -493,8 +515,7 @@ func main() {
 			return
 		}
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			indexTmpl.Execute(w, map[string]any{"DemoMode": demoMode})
+			renderTemplate(w, "index", indexTmpl, http.StatusOK, map[string]any{"DemoMode": demoMode})
 			return
 		}
 		fileServer.ServeHTTP(w, r)

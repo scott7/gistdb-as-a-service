@@ -1,702 +1,518 @@
 <!DOCTYPE html>
-<html lang="en" data-demo-mode="{{.DemoMode}}">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GistDB Admin</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a1a'/><path d='M7 11v10c0 2.2 4 4 9 4s9-1.8 9-4V11' fill='%232563eb'/><ellipse cx='16' cy='11' rx='9' ry='3.5' fill='%233b82f6'/><ellipse cx='16' cy='17' rx='9' ry='3.5' fill='none' stroke='%2393c5fd' stroke-width='1.2'/><ellipse cx='16' cy='21' rx='9' ry='3.5' fill='%231d4ed8'/></svg>">
+<script>
+  // Runs before first paint so a stored preference never flashes the other theme.
+  // No stored value means "auto": Pico falls back to prefers-color-scheme.
+  (() => {
+    const t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Pico handles typography, form controls, buttons, tables, dialogs and the
+     light/dark palette. Everything below is app-shell layout Pico doesn't cover. */
+
+  :root {
+    --pico-font-size: 87.5%;
+    --pico-line-height: 1.45;
+    --pico-border-radius: 0.25rem;
+    --pico-form-element-spacing-vertical: 0.4rem;
+    --pico-form-element-spacing-horizontal: 0.6rem;
+    --mono: var(--pico-font-family-monospace, 'SF Mono', 'Fira Code', monospace);
+  }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 14px;
-    background: #f5f5f5;
-    color: #1a1a1a;
-    height: 100vh;
+    margin: 0;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
-  header {
-    background: #1a1a1a;
-    color: #fff;
-    padding: 0 16px;
+  /* Pico sizes buttons to fill their container; in a toolbar we want them snug. */
+  button, [role="button"] { width: auto; }
+
+  button.danger,
+  button.danger:is(:hover, :active, :focus) {
+    --pico-background-color: #c0392b;
+    --pico-border-color: #c0392b;
+    --pico-color: #fff;
+  }
+  button.danger:is(:hover, :active) {
+    --pico-background-color: #a5301f;
+    --pico-border-color: #a5301f;
+  }
+
+  .app-bar, .toolbar, .status-bar {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
-    height: 48px;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: var(--pico-card-sectioning-background-color);
+  }
+
+  .app-bar { border-bottom: 1px solid var(--pico-muted-border-color); }
+  .app-bar h1 { font-size: 1rem; margin: 0; white-space: nowrap; }
+  .app-bar mark { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; }
+
+  .toolbar { border-bottom: 1px solid var(--pico-muted-border-color); }
+  .toolbar label { margin: 0; color: var(--pico-muted-color); white-space: nowrap; }
+  .toolbar select { width: 14rem; margin: 0; }
+
+  .push-right { margin-left: auto; }
+
+  .theme-toggle {
+    font-size: 0.95rem;
+    line-height: 1;
+    padding-inline: 0.7rem;
+  }
+
+  .workspace { display: flex; flex: 1; overflow: hidden; }
+
+  .sidebar {
+    width: 15rem;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--pico-muted-border-color);
   }
 
-  header h1 {
-    font-size: 15px;
+  .sidebar > h2 {
+    margin: 0;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-    margin-right: 8px;
-  }
-
-  .demo-badge {
-    margin-left: auto;
-    background: #854d0e;
-    color: #fef08a;
-    font-size: 11px;
-    font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    padding: 3px 10px;
-    border-radius: 4px;
-    white-space: nowrap;
+    color: var(--pico-muted-color);
+    border-bottom: 1px solid var(--pico-muted-border-color);
   }
 
-  .btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .btn {
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    padding: 5px 12px;
-    height: 30px;
-    white-space: nowrap;
-  }
-
-  .btn-primary   { background: #3b82f6; color: #fff; }
-  .btn-primary:hover { background: #2563eb; }
-  .btn-danger    { background: #ef4444; color: #fff; }
-  .btn-danger:hover  { background: #dc2626; }
-  .btn-secondary { background: #e5e7eb; color: #1a1a1a; }
-  .btn-secondary:hover { background: #d1d5db; }
-
-  #toolbar {
-    background: #fff;
-    border-bottom: 1px solid #e5e7eb;
-    padding: 8px 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  #toolbar label { color: #555; font-size: 13px; }
-
-  #input-collection {
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 13px;
-    width: 200px;
-    height: 30px;
-    background: #fff;
-    cursor: pointer;
-  }
-
-  #input-collection:focus { outline: none; border-color: #3b82f6; }
-
-  #main {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  #sidebar {
-    width: 240px;
-    flex-shrink: 0;
-    background: #fff;
-    border-right: 1px solid #e5e7eb;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  #sidebar-header {
-    padding: 10px 12px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #6b7280;
-    border-bottom: 1px solid #f0f0f0;
-    flex-shrink: 0;
-  }
-
-  #doc-list {
+  .doc-list {
     flex: 1;
     overflow-y: auto;
+    margin: 0;
+    padding: 0;
     list-style: none;
   }
 
-  #doc-list li {
-    padding: 8px 12px;
+  .doc-list li {
+    padding: 0.45rem 0.75rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
     cursor: pointer;
-    font-size: 13px;
-    color: #374151;
-    border-bottom: 1px solid #f9f9f9;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 12px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    border-bottom: 1px solid var(--pico-muted-border-color);
   }
 
-  #doc-list li:hover   { background: #f3f4f6; }
-  #doc-list li.active  { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+  .doc-list li:hover { background: var(--pico-card-sectioning-background-color); }
 
-  #doc-list .empty-msg {
-    color: #9ca3af;
+  .doc-list li.active {
+    background: var(--pico-primary-background);
+    color: var(--pico-primary-inverse);
+    font-weight: 600;
+  }
+
+  .doc-list .empty {
     font-family: inherit;
-    font-size: 13px;
-    font-weight: normal;
+    font-size: inherit;
+    color: var(--pico-muted-color);
     cursor: default;
-    padding: 16px 12px;
+    border-bottom: none;
+    padding: 1rem 0.75rem;
   }
+  .doc-list .empty:hover { background: none; }
 
-  #doc-panel {
+  .doc-panel {
     flex: 1;
-    padding: 20px 24px;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+    padding: 1rem 1.25rem;
   }
 
-  #doc-panel .placeholder {
-    margin: auto;
-    color: #9ca3af;
+  .doc-panel .placeholder {
+    color: var(--pico-muted-color);
     text-align: center;
+    margin-top: 3rem;
   }
 
-  #doc-meta {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    padding: 14px 16px;
-  }
+  .doc-panel article { margin: 0 0 1rem; padding: 0.75rem 1rem; }
+  .doc-panel table { margin: 0; font-size: 0.8rem; }
+  .doc-panel td { padding: 0.15rem 0; border: none; }
+  .doc-panel td:first-child { width: 7rem; color: var(--pico-muted-color); }
+  .doc-panel td:last-child { font-family: var(--mono); word-break: break-all; }
 
-  #doc-meta table {
-    border-collapse: collapse;
-    width: 100%;
-  }
-
-  #doc-meta td {
-    padding: 3px 0;
-    vertical-align: top;
-  }
-
-  #doc-meta td:first-child {
-    color: #6b7280;
-    font-size: 12px;
-    width: 100px;
-    padding-right: 12px;
-  }
-
-  #doc-meta td:last-child {
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 12px;
-    word-break: break-all;
-  }
-
-  #data-section label {
+  .field-label {
     display: block;
-    font-size: 12px;
+    font-size: 0.7rem;
     font-weight: 600;
-    color: #6b7280;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 6px;
+    color: var(--pico-muted-color);
   }
 
-  #data-editor {
-    width: 100%;
-    min-height: 260px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    padding: 12px;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 12px;
+  textarea.code {
+    font-family: var(--mono);
+    font-size: 0.75rem;
     line-height: 1.6;
+    min-height: 16rem;
     resize: vertical;
-    background: #fafafa;
-    color: #1a1a1a;
   }
 
-  #data-editor:focus { outline: none; border-color: #3b82f6; background: #fff; }
+  dialog textarea.code { min-height: 10rem; }
 
-  #doc-actions {
-    display: flex;
-    gap: 8px;
+  .actions { display: flex; gap: 0.5rem; }
+  .actions.right { justify-content: flex-end; }
+
+  .status-bar {
+    border-top: 1px solid var(--pico-muted-border-color);
+    font-size: 0.75rem;
+    color: var(--pico-muted-color);
+    min-height: 2rem;
   }
+  .status-bar.ok    { color: #16a34a; }
+  .status-bar.error { color: var(--pico-del-color, #c0392b); }
 
-  #status-bar {
-    height: 32px;
-    padding: 0 16px;
-    display: flex;
-    align-items: center;
-    font-size: 12px;
-    background: #fff;
-    border-top: 1px solid #e5e7eb;
-    flex-shrink: 0;
-    color: #6b7280;
-  }
-
-  #status-bar.ok    { color: #16a34a; }
-  #status-bar.error { color: #dc2626; }
-
-  /* ── Modal ── */
-  #created-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.4);
-    z-index: 200;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #created-overlay.open { display: flex; }
-
-  #modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.4);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #modal-overlay.open { display: flex; }
-
-  #modal {
-    background: #fff;
-    border-radius: 8px;
-    padding: 24px;
-    width: 480px;
-    max-width: 90vw;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  }
-
-  #modal h2 { font-size: 15px; font-weight: 600; }
-
-  .modal-field { display: flex; flex-direction: column; gap: 4px; }
-
-  .modal-field label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .modal-field input {
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    padding: 6px 10px;
-    font-size: 13px;
-    height: 32px;
-  }
-
-  .modal-field input:focus { outline: none; border-color: #3b82f6; }
-
-  .modal-field textarea {
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    padding: 10px;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 12px;
-    line-height: 1.6;
-    resize: vertical;
-    min-height: 160px;
-    background: #fafafa;
-  }
-
-  .modal-field textarea:focus { outline: none; border-color: #3b82f6; background: #fff; }
-
-  #modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  dialog article { margin: 0; }
+  dialog article > header, dialog article > footer { padding: 0.75rem 1rem; }
+  dialog h2 { font-size: 1rem; margin: 0; }
+  dialog input[readonly] { font-family: var(--mono); }
 
   @media (max-width: 640px) {
-    header { height: auto; flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
-    header h1 { width: 100%; margin-right: 0; }
-    #toolbar { flex-wrap: wrap; }
-    #input-collection { flex: 1; width: auto; }
-    #main { flex-direction: column; }
-    #sidebar { width: 100%; height: 180px; border-right: none; border-bottom: 1px solid #e5e7eb; }
-    #doc-panel { padding: 12px; }
+    .app-bar, .toolbar { flex-wrap: wrap; }
+    .toolbar select { flex: 1; width: auto; }
+    .workspace { flex-direction: column; }
+    .sidebar {
+      width: 100%;
+      height: 11rem;
+      border-right: none;
+      border-bottom: 1px solid var(--pico-muted-border-color);
+    }
+    .doc-panel { padding: 0.75rem; }
   }
 </style>
 </head>
-<body>
 
-<header>
+<body x-data="admin" x-init="fetchCollections()">
+
+<header class="app-bar">
   <h1>GistDB Admin</h1>
-  {{if .DemoMode}}<span class="demo-badge">Demo Mode — read only</span>{{else}}<button class="btn btn-secondary" style="margin-left:auto" onclick="window.location='/logout'">Logout</button>{{end}}
+  <button class="secondary outline push-right theme-toggle" @click="toggleTheme()"
+          :aria-label="'Switch to ' + (isDark ? 'light' : 'dark') + ' mode'"
+          :title="'Switch to ' + (isDark ? 'light' : 'dark') + ' mode'"
+          x-text="isDark ? '☀' : '☾'"></button>
+  {{if .DemoMode}}
+    <mark>Demo mode — read only</mark>
+  {{else}}
+    <button class="secondary outline" onclick="window.location='/logout'">Logout</button>
+  {{end}}
 </header>
 
-<div id="toolbar">
-  <label for="input-collection">Collection</label>
-  <select id="input-collection" onchange="loadCollection()">
+<nav class="toolbar">
+  <label for="collection">Collection</label>
+  <select id="collection" x-model="collection" @change="loadCollection()">
     <option value="">— select —</option>
+    <template x-for="c in collections" :key="c">
+      <option :value="c" x-text="c"></option>
+    </template>
   </select>
-  {{if not .DemoMode}}<button class="btn btn-primary" onclick="openNewDocModal()">+ New Document</button>{{end}}
-  <button class="btn btn-secondary" style="margin-left:auto" onclick="clearCache()" {{if .DemoMode}}disabled{{end}}>Clear DB Cache</button>
-</div>
+  {{if not .DemoMode}}<button @click="openNewDoc()">+ New Document</button>{{end}}
+  <button class="secondary push-right" @click="clearCache()" {{if .DemoMode}}disabled{{end}}>Clear DB Cache</button>
+</nav>
 
-<div id="created-overlay">
-  <div id="modal">
-    <h2>Document Created</h2>
-    <div class="modal-field">
-      <label>Document ID</label>
-      <input id="created-id" type="text" readonly style="font-family:monospace;background:#f3f4f6;cursor:default">
-    </div>
-    <div class="modal-field">
-      <label>Collection</label>
-      <input id="created-col" type="text" readonly style="background:#f3f4f6;cursor:default">
-    </div>
-    <div id="modal-actions">
-      <button class="btn btn-primary" onclick="closeCreatedModal()">OK</button>
-    </div>
-  </div>
-</div>
-
-<div id="modal-overlay" onclick="handleOverlayClick(event)">
-  <div id="modal">
-    <h2>New Document</h2>
-    <div class="modal-field">
-      <label for="modal-collection">Collection</label>
-      <input id="modal-collection" type="text" placeholder="e.g. users">
-    </div>
-    <div class="modal-field">
-      <label for="modal-data">Data (JSON)</label>
-      <textarea id="modal-data" spellcheck="false"></textarea>
-      <button class="btn btn-secondary" style="margin-top:6px;font-size:12px" onclick="applyStringify('modal-data', this)">Convert to JSON string</button>
-    </div>
-    <div id="modal-actions">
-      <button class="btn btn-secondary" onclick="closeNewDocModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="createDocument()">Create</button>
-    </div>
-  </div>
-</div>
-
-<div id="main">
-  <aside id="sidebar">
-    <div id="sidebar-header">Documents</div>
-    <ul id="doc-list">
-      <li class="empty-msg">Load a collection to begin</li>
+<div class="workspace">
+  <aside class="sidebar">
+    <h2>Documents</h2>
+    <ul class="doc-list">
+      <li class="empty" x-show="!ids.length" x-text="collection ? 'No documents in this collection' : 'Load a collection to begin'"></li>
+      <template x-for="id in ids" :key="id">
+        <li :class="{ active: id === currentId }" @click="loadDocument(id)" x-text="id"></li>
+      </template>
     </ul>
   </aside>
 
-  <div id="doc-panel">
-    <p class="placeholder">Select a document from the list</p>
-  </div>
+  <section class="doc-panel">
+    <p class="placeholder" x-show="!doc">Select a document from the list</p>
+
+    <div x-show="doc" style="display:none">
+      <article>
+        <table>
+          <tbody>
+            <template x-for="row in metaRows" :key="row[0]">
+              <tr><td x-text="row[0]"></td><td x-text="row[1]"></td></tr>
+            </template>
+          </tbody>
+        </table>
+      </article>
+
+      <label class="field-label" for="data-editor">data</label>
+      <textarea id="data-editor" class="code" spellcheck="false"
+                x-model="editor" {{if .DemoMode}}readonly{{end}}></textarea>
+
+      {{if not .DemoMode}}
+      <div class="actions">
+        <button @click="saveDocument()">Save</button>
+        <button class="danger" @click="deleteDocument()">Delete</button>
+        <button class="secondary outline" @click="stringify('editor')" :disabled="stringified.editor"
+                x-text="stringified.editor ? 'Converted' : 'Convert to JSON string'"></button>
+      </div>
+      {{end}}
+    </div>
+  </section>
 </div>
 
-<div id="status-bar">Ready</div>
+<footer class="status-bar" :class="status.type" x-text="status.msg">Ready</footer>
+
+{{if not .DemoMode}}
+<dialog :open="newDoc.open" @click.self="newDoc.open = false" @keydown.escape.window="newDoc.open = false">
+  <article>
+    <header><h2>New Document</h2></header>
+
+    <label class="field-label" for="new-collection">Collection</label>
+    <input id="new-collection" type="text" placeholder="e.g. users" x-model="newDoc.collection" x-ref="newCollection">
+
+    <label class="field-label" for="new-data">Data (JSON)</label>
+    <textarea id="new-data" class="code" spellcheck="false" x-model="newDoc.data"></textarea>
+    <button class="secondary outline" @click="stringify('newData')" :disabled="stringified.newData"
+            x-text="stringified.newData ? 'Converted' : 'Convert to JSON string'"></button>
+
+    <footer class="actions right">
+      <button class="secondary" @click="newDoc.open = false">Cancel</button>
+      <button @click="createDocument()">Create</button>
+    </footer>
+  </article>
+</dialog>
+{{end}}
+
+<dialog :open="created.open" @keydown.escape.window="created.open = false">
+  <article>
+    <header><h2>Document Created</h2></header>
+
+    <label class="field-label" for="created-id">Document ID</label>
+    <input id="created-id" type="text" readonly :value="created.id">
+
+    <label class="field-label" for="created-collection">Collection</label>
+    <input id="created-collection" type="text" readonly :value="created.collection">
+
+    <footer class="actions right">
+      <button @click="created.open = false">OK</button>
+    </footer>
+  </article>
+</dialog>
 
 <script>
-  const DEMO_MODE = document.documentElement.dataset.demoMode === 'true';
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('admin', () => ({
+      collections: [],
+      collection: '',
+      ids: [],
+      currentId: '',
+      doc: null,
+      editor: '',
+      status: { msg: 'Ready', type: '' },
+      stringified: { editor: false, newData: false },
+      newDoc: { open: false, collection: '', data: '' },
+      created: { open: false, id: '', collection: '' },
 
-  let currentCollection = '';
-  let currentDocId = '';
+      // '' means auto (follow the OS); 'light'/'dark' are explicit overrides.
+      theme: localStorage.getItem('theme') || '',
+      systemDark: false,
 
-  // Status bar
+      init() {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        this.systemDark = mq.matches;
+        // Keep the icon honest if the OS flips while we are still on auto.
+        mq.addEventListener('change', e => { this.systemDark = e.matches; });
+      },
 
-  function setStatus(msg, type = '') {
-    const bar = document.getElementById('status-bar');
-    bar.textContent = msg;
-    bar.className = type;
-  }
+      get isDark() {
+        return this.theme ? this.theme === 'dark' : this.systemDark;
+      },
 
-  // Fetch helper — calls the server-side proxy; JWT is attached by the Go server
+      toggleTheme() {
+        this.theme = this.isDark ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', this.theme);
+        localStorage.setItem('theme', this.theme);
+      },
 
-  async function apiFetch(path, options = {}) {
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    };
-    const res = await fetch('/api' + path, { ...options, headers });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`${res.status} ${res.statusText}: ${text.trim()}`);
-    }
-    return res.json();
-  }
+      setStatus(msg, type = '') {
+        this.status = { msg, type };
+      },
 
-  // Collection listing
+      // Calls the server-side proxy; the JWT is attached by the Go server.
+      async apiFetch(path, options = {}) {
+        const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+        const res = await fetch('/api' + path, { ...options, headers });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`${res.status} ${res.statusText}: ${text.trim()}`);
+        }
+        return res.json();
+      },
 
-  async function fetchCollections() {
-    try {
-      const data = await apiFetch('/collections_list');
-      const select = document.getElementById('input-collection');
-      const current = select.value;
-      // keep placeholder, repopulate options
-      select.innerHTML = '<option value="">— select —</option>';
-      (data.collections || []).forEach(col => {
-        const opt = document.createElement('option');
-        opt.value = col;
-        opt.textContent = col;
-        if (col === current) opt.selected = true;
-        select.appendChild(opt);
-      });
-    } catch (e) {
-      console.error(e);
-      setStatus('Collections failed: ' + e.message, 'error');
-    }
-  }
+      async fetchCollections() {
+        try {
+          const data = await this.apiFetch('/collections_list');
+          this.collections = data.collections || [];
+        } catch (e) {
+          console.error(e);
+          this.setStatus('Collections failed: ' + e.message, 'error');
+        }
+      },
 
-  async function loadCollection() {
-    const col = document.getElementById('input-collection').value;
-    if (!col) return;
+      async loadCollection() {
+        if (!this.collection) return;
+        this.setStatus('Loading…');
+        try {
+          const data = await this.apiFetch(`/collections/${encodeURIComponent(this.collection)}`);
+          this.ids = data.ids || [];
+          this.clearDoc();
+          this.setStatus(`Loaded ${this.ids.length} document(s) from "${this.collection}"`, 'ok');
+        } catch (e) {
+          this.setStatus(e.message, 'error');
+        }
+      },
 
-    setStatus('Loading…');
-    try {
-      const data = await apiFetch(`/collections/${encodeURIComponent(col)}`);
-      currentCollection = col;
-      currentDocId = '';
-      renderDocList(data.ids || []);
-      clearDocPanel();
-      setStatus(`Loaded ${(data.ids || []).length} document(s) from "${col}"`, 'ok');
-    } catch (e) {
-      setStatus(e.message, 'error');
-    }
-  }
+      async loadDocument(id) {
+        this.setStatus('Loading…');
+        this.currentId = id;
+        try {
+          const res = await this.apiFetch(
+            `/collections/${encodeURIComponent(this.collection)}/${encodeURIComponent(id)}`
+          );
+          this.doc = res.content || {};
+          this.editor = JSON.stringify(this.doc.data ?? {}, null, 2);
+          this.stringified.editor = false;
+          this.setStatus(`Loaded ${id}`, 'ok');
+        } catch (e) {
+          this.setStatus(e.message, 'error');
+        }
+      },
 
-  function renderDocList(ids) {
-    const list = document.getElementById('doc-list');
-    list.innerHTML = '';
-    if (!ids.length) {
-      const li = document.createElement('li');
-      li.className = 'empty-msg';
-      li.textContent = 'No documents in this collection';
-      list.appendChild(li);
-      return;
-    }
-    ids.forEach(id => {
-      const li = document.createElement('li');
-      li.textContent = id;
-      li.dataset.id = id;
-      li.onclick = () => loadDocument(id);
-      list.appendChild(li);
-    });
-  }
+      clearDoc() {
+        this.currentId = '';
+        this.doc = null;
+        this.editor = '';
+        this.stringified.editor = false;
+      },
 
-  // Document view
+      get metaRows() {
+        const c = this.doc || {};
+        const rows = [
+          ['id', c.id || ''],
+          ['collection', c.collection || ''],
+          ['createdAt', c.createdAt || ''],
+        ];
+        if (c.modifiedAt) rows.push(['modifiedAt', c.modifiedAt]);
+        return rows;
+      },
 
-  async function loadDocument(id) {
-    setStatus('Loading…');
-    // highlight active
-    document.querySelectorAll('#doc-list li').forEach(li => li.classList.remove('active'));
-    const active = document.querySelector(`#doc-list li[data-id="${CSS.escape(id)}"]`);
-    if (active) active.classList.add('active');
+      async saveDocument() {
+        if (!this.currentId) return;
+        let parsed;
+        try {
+          parsed = JSON.parse(this.editor);
+        } catch (e) {
+          this.setStatus('Invalid JSON: ' + e.message, 'error');
+          return;
+        }
 
-    try {
-      const res = await apiFetch(`/collections/${encodeURIComponent(currentCollection)}/${encodeURIComponent(id)}`);
-      currentDocId = id;
-      renderDocPanel(res);
-      setStatus(`Loaded ${id}`, 'ok');
-    } catch (e) {
-      setStatus(e.message, 'error');
-    }
-  }
+        this.setStatus('Saving…');
+        try {
+          await this.apiFetch(
+            `/collections/${encodeURIComponent(this.collection)}/${encodeURIComponent(this.currentId)}`,
+            { method: 'PATCH', body: JSON.stringify({ data: parsed }) }
+          );
+          this.setStatus(`Saved ${this.currentId}`, 'ok');
+        } catch (e) {
+          this.setStatus(e.message, 'error');
+        }
+      },
 
-  function renderDocPanel(res) {
-    const content = res.content || {};
-    const panel = document.getElementById('doc-panel');
+      async deleteDocument() {
+        if (!this.currentId) return;
+        if (!confirm(`Delete "${this.currentId}" from "${this.collection}"?`)) return;
 
-    const rows = [
-      ['id',          content.id         || ''],
-      ['collection',  content.collection  || ''],
-      ['createdAt',   content.createdAt   || ''],
-    ];
-    if (content.modifiedAt) rows.push(['modifiedAt', content.modifiedAt]);
+        const id = this.currentId;
+        this.setStatus('Deleting…');
+        try {
+          await this.apiFetch(
+            `/collections/${encodeURIComponent(this.collection)}/${encodeURIComponent(id)}`,
+            { method: 'DELETE' }
+          );
+          this.ids = this.ids.filter(x => x !== id);
+          this.clearDoc();
+          this.setStatus('Document deleted', 'ok');
+        } catch (e) {
+          this.setStatus(e.message, 'error');
+        }
+      },
 
-    const metaRows = rows.map(([k, v]) =>
-      `<tr><td>${k}</td><td>${escHtml(v)}</td></tr>`
-    ).join('');
+      openNewDoc() {
+        this.newDoc = { open: true, collection: this.collection || '', data: '' };
+        this.stringified.newData = false;
+        this.$nextTick(() => this.$refs.newCollection?.focus());
+      },
 
-    panel.innerHTML = `
-      <div id="doc-meta">
-        <table>${metaRows}</table>
-      </div>
-      <div id="data-section">
-        <label for="data-editor">data</label>
-        <textarea id="data-editor" spellcheck="false"${DEMO_MODE ? ' readonly' : ''}>${escHtml(JSON.stringify(content.data ?? {}, null, 2))}</textarea>
-        ${DEMO_MODE ? '' : '<button class="btn btn-secondary" style="margin-top:6px;font-size:12px" onclick="applyStringify(\'data-editor\', this)">Convert to JSON string</button>'}
-      </div>
-      ${DEMO_MODE ? '' : `
-      <div id="doc-actions">
-        <button class="btn btn-primary" onclick="saveDocument()">Save</button>
-        <button class="btn btn-danger"  onclick="deleteDocument()">Delete</button>
-      </div>
-      `}
-    `;
-  }
+      async createDocument() {
+        const col = this.newDoc.collection.trim();
+        if (!col) {
+          this.$refs.newCollection.focus();
+          return;
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(this.newDoc.data);
+        } catch (e) {
+          this.setStatus('Invalid JSON: ' + e.message, 'error');
+          return;
+        }
 
-  function clearDocPanel() {
-    document.getElementById('doc-panel').innerHTML =
-      '<p class="placeholder">Select a document from the list</p>';
-  }
+        this.setStatus('Creating…');
+        try {
+          const res = await this.apiFetch(`/collections/${encodeURIComponent(col)}`, {
+            method: 'POST',
+            body: JSON.stringify({ data: parsed }),
+          });
+          this.newDoc.open = false;
+          this.setStatus(`Created ${res.id} in "${col}"`, 'ok');
+          if (col === this.collection) this.ids.push(res.id);
+          this.created = { open: true, id: res.id, collection: col };
+        } catch (e) {
+          this.setStatus(e.message, 'error');
+        }
+      },
 
-  // Save (PATCH)
+      // Wrap the raw editor text as a JSON string literal, for storing data
+      // that is itself a string rather than an object.
+      stringify(target) {
+        if (target === 'editor') this.editor = JSON.stringify(this.editor);
+        else this.newDoc.data = JSON.stringify(this.newDoc.data);
+        this.stringified[target] = true;
+      },
 
-  async function saveDocument() {
-    if (!currentDocId) return;
-    const raw = document.getElementById('data-editor').value;
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      setStatus('Invalid JSON: ' + e.message, 'error');
-      return;
-    }
-
-    setStatus('Saving…');
-    try {
-      await apiFetch(
-        `/collections/${encodeURIComponent(currentCollection)}/${encodeURIComponent(currentDocId)}`,
-        { method: 'PATCH', body: JSON.stringify({ data: parsed }) }
-      );
-      setStatus(`Saved ${currentDocId}`, 'ok');
-    } catch (e) {
-      setStatus(e.message, 'error');
-    }
-  }
-
-  // Delete
-
-  async function deleteDocument() {
-    if (!currentDocId) return;
-    if (!confirm(`Delete "${currentDocId}" from "${currentCollection}"?`)) return;
-
-    setStatus('Deleting…');
-    try {
-      await apiFetch(
-        `/collections/${encodeURIComponent(currentCollection)}/${encodeURIComponent(currentDocId)}`,
-        { method: 'DELETE' }
-      );
-      // remove from list
-      const li = document.querySelector(`#doc-list li[data-id="${CSS.escape(currentDocId)}"]`);
-      if (li) li.remove();
-      if (!document.querySelectorAll('#doc-list li:not(.empty-msg)').length) {
-        const list = document.getElementById('doc-list');
-        list.innerHTML = '<li class="empty-msg">No documents in this collection</li>';
-      }
-      currentDocId = '';
-      clearDocPanel();
-      setStatus('Document deleted', 'ok');
-    } catch (e) {
-      setStatus(e.message, 'error');
-    }
-  }
-
-  // Utils
-
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
-  // JSON stringify helper
-
-  function applyStringify(textareaId, btn) {
-    const ta = document.getElementById(textareaId);
-    ta.value = JSON.stringify(ta.value);
-    btn.disabled = true;
-    btn.textContent = 'Converted';
-  }
-
-  // New document modal
-
-  function showCreatedModal(id, col) {
-    document.getElementById('created-id').value  = id;
-    document.getElementById('created-col').value = col;
-    document.getElementById('created-overlay').classList.add('open');
-  }
-
-  function closeCreatedModal() {
-    document.getElementById('created-overlay').classList.remove('open');
-  }
-
-  function openNewDocModal() {
-    document.getElementById('modal-collection').value = currentCollection || '';
-    document.getElementById('modal-data').value = '';
-    document.getElementById('modal-overlay').classList.add('open');
-    document.getElementById('modal-collection').focus();
-  }
-
-  function closeNewDocModal() {
-    document.getElementById('modal-overlay').classList.remove('open');
-  }
-
-  function handleOverlayClick(e) {
-    if (e.target === document.getElementById('modal-overlay')) closeNewDocModal();
-  }
-
-  async function createDocument() {
-    const col = document.getElementById('modal-collection').value.trim();
-    if (!col) {
-      document.getElementById('modal-collection').focus();
-      return;
-    }
-    const raw = document.getElementById('modal-data').value;
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      setStatus('Invalid JSON: ' + e.message, 'error');
-      return;
-    }
-
-    setStatus('Creating…');
-    try {
-      const res = await apiFetch(`/collections/${encodeURIComponent(col)}`, {
-        method: 'POST',
-        body: JSON.stringify({ data: parsed }),
-      });
-      closeNewDocModal();
-      setStatus(`Created ${res.id} in "${col}"`, 'ok');
-      // if the active collection matches, append to the list
-      if (col === currentCollection) {
-        const list = document.getElementById('doc-list');
-        list.querySelector('.empty-msg')?.remove();
-        const li = document.createElement('li');
-        li.textContent = res.id;
-        li.dataset.id = res.id;
-        li.onclick = () => loadDocument(res.id);
-        list.appendChild(li);
-      }
-      showCreatedModal(res.id, col);
-    } catch (e) {
-      setStatus(e.message, 'error');
-    }
-  }
-
-  // Clear cache
-
-  async function clearCache() {
-    setStatus('Clearing cache…');
-    try {
-      await apiFetch('/clear_cache', { method: 'POST' });
-      setStatus('Cache cleared', 'ok');
-      alert('Cache cleared successfully');
-    } catch (e) {
-      setStatus(e.message, 'error');
-    }
-  }
-
-  // Init
-
-  fetchCollections();
+      async clearCache() {
+        this.setStatus('Clearing cache…');
+        try {
+          await this.apiFetch('/clear_cache', { method: 'POST' });
+          this.setStatus('Cache cleared', 'ok');
+          alert('Cache cleared successfully');
+        } catch (e) {
+          this.setStatus(e.message, 'error');
+        }
+      },
+    }));
+  });
 </script>
 </body>
 </html>
